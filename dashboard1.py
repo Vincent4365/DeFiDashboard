@@ -23,7 +23,7 @@ def load_pool_chart(pool_id):
 
 # 3. App Layout
 st.title('DeFi Lending rates')
-st.markdown('Real-time lending rates. Data source: DefiLlama.')
+st.markdown('Real-time lending rates. Data source: DefiLlama. Final Project FA 591 Blockchain Technologies & Decentralized Finance.')
 
 # 4. Load Data
 df = load_data()
