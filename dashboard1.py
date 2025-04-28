@@ -22,7 +22,7 @@ def load_pool_chart(pool_id):
     return df
 
 # 3. App Layout
-st.title('DeFi Lending & Borrowing rates')
+st.title('DeFi Lending rates')
 st.markdown('Real-time lending rates. Data source: DefiLlama.')
 
 # 4. Load Data
@@ -81,10 +81,10 @@ else:
     st.warning("No pools match your filters. Try selecting more tokens or platforms.")
 
 # 8. Simulate Earnings
-st.header("Simulate Your Lending Earnings")
+st.header("Simulate earnings")
 
 if not filtered_df.empty:
-    amount = st.number_input("Amount to Lend (USD)", value=1000)
+    amount = st.number_input("Amount to lend (USD)", value=1000)
     days = st.slider("Duration (days)", 1, 365, 30)
 
     # Show project and chain in simulation selector
