@@ -22,8 +22,8 @@ def load_pool_chart(pool_id):
     return df
 
 # 3. App Layout
-st.title('DeFi Lending & Borrowing Dashboard')
-st.markdown('Real-time lending rates. Source: DefiLlama')
+st.title('DeFi Lending & Borrowing rates')
+st.markdown('Real-time lending rates. Data source: DefiLlama.')
 
 # 4. Load Data
 df = load_data()
