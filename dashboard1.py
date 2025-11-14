@@ -207,13 +207,15 @@ if not filtered_df.empty:
 
     # Rename only for display
     sorted_df = sorted_df.rename(columns={
-    "tvlUsd": "Total Liquidity",
-    "riskFlag": "Risk Level"
+        "tvlUsd": "Total Liquidity",
+        "riskFlag": "Risk Level"
     })
 
+    # IMPORTANT: use the *new* column name in subset + format
     styled_df = (
-        sorted_df.style.map(color_tvls, subset=["tvlUsd"])
-        .format({"apy": "{:.2f}", "tvlUsd": "${:,.0f}"})
+        sorted_df.style
+        .map(color_tvls, subset=["Total Liquidity"])
+        .format({"apy": "{:.2f}", "Total Liquidity": "${:,.0f}"})
     )
 
     st.dataframe(styled_df, width="stretch")
@@ -249,12 +251,15 @@ if not filtered_df.empty:
     history_df = load_pool_chart(pool_id)
 
     if not history_df.empty and "timestamp" in history_df.columns:
-        # Robust timestamp conversion
-        if not np.issubdtype(history_df["timestamp"].dtype, np.datetime64):
-            if np.issubdtype(history_df["timestamp"].dtype, np.number):
-                history_df["timestamp"] = pd.to_datetime(history_df["timestamp"], unit="s")
-            else:
-                history_df["timestamp"] = pd.to_datetime(history_df["timestamp"], errors="coerce")
+        # Robust timestamp conversion (force datetime)
+        if np.issubdtype(history_df["timestamp"].dtype, np.number):
+            history_df["timestamp"] = pd.to_datetime(
+                history_df["timestamp"], unit="s", errors="coerce"
+            )
+        else:
+            history_df["timestamp"] = pd.to_datetime(
+                history_df["timestamp"], errors="coerce"
+            )
 
         # Drop rows where timestamp couldn't be parsed
         history_df = history_df.dropna(subset=["timestamp"])
@@ -278,13 +283,12 @@ if not filtered_df.empty:
             if risk_score is not None:
                 st.metric("Risk Score (0–100)", f"{risk_score:.0f}")
 
-        # 30-day summary stats
+        # 30-day summary stats (now safe: timestamp is datetime)
         if not history_df.empty:
             max_ts = history_df["timestamp"].max()
             if pd.notna(max_ts):
-                last_30d = history_df[
-                    history_df["timestamp"] >= max_ts - pd.Timedelta(days=30)
-                ]
+                cutoff = max_ts - pd.Timedelta(days=30)
+                last_30d = history_df[history_df["timestamp"] >= cutoff]
                 if not last_30d.empty:
                     mean_30d = last_30d["apy"].mean()
                     min_apy = history_df["apy"].min()
