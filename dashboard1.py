@@ -4,7 +4,8 @@ import streamlit as st
 import plotly.express as px
 import numpy as np
 
-# 1. Load Lending Pools Data
+# Data loading with Streamlit caching (auto-refresh every 3600s)
+# Source: DefiLlama yields and historical APY data
 @st.cache_data(ttl=3600)
 def load_data():
     url = "https://yields.llama.fi/pools"
@@ -13,7 +14,6 @@ def load_data():
     df = pd.json_normalize(data["data"])
     return df
 
-# 2. Load Pool Historical Data
 @st.cache_data(ttl=3600)
 def load_pool_chart(pool_id):
     url = f"https://yields.llama.fi/chart/{pool_id}"
@@ -22,7 +22,7 @@ def load_pool_chart(pool_id):
     df = pd.DataFrame(data["data"])
     return df
 
-# 3. Compute risk metrics
+# Risk metrics based on an assigned score.
 def compute_risk_metrics(history_df, tvl_usd):
     """
     Compute simple risk metrics from historical APY and TVL.
@@ -33,7 +33,7 @@ def compute_risk_metrics(history_df, tvl_usd):
     if hist.empty or len(hist) < 2:
         return None, None, None, None
 
-    # Volatility of APY level (percentage points)
+    # Volatility of APY level (% points)
     apy_level_vol = hist["apy"].std()
 
     # Volatility of APY changes (day-to-day jumps, % change)
@@ -47,18 +47,34 @@ def compute_risk_metrics(history_df, tvl_usd):
 
     mean_apy = hist["apy"].mean()
 
-    # ---------- Improved numeric risk score (0–100) ----------
     risk_score = 0
 
-    # TVL component (0 = safest, up to 30 = riskiest)
-    if tvl_usd >= 200_000_000:
-        tvl_score = 5
-    elif tvl_usd >= 50_000_000:
-        tvl_score = 10
-    elif tvl_usd >= 10_000_000:
-        tvl_score = 20
-    else:
-        tvl_score = 30
+# TVL component (2-40) of risk score, where higher risk is assigned to lower TVL value
+def compute_tvl_score(tvl_usd: float) -> float:
+    """
+    TVL-based risk penalty.
+    Small pools get a high score (more risky), large pools get a low score.
+    Clamped between 2 and 40.
+    """
+    if tvl_usd is None or tvl_usd <= 0:
+        return 40.0  # Treat unknown/zero TVL as extremely risky
+
+    # Avoid going below anchor
+    tvl_clamped = max(tvl_usd, 500_000)
+
+    log_tvl = np.log10(tvl_clamped)
+
+    # Parameters fitted so that TVL of 500k returns approximate risk of 40 and 200m as 5
+    a = 116.7
+    b = 13.46
+
+    tvl_score = a - b * log_tvl
+
+    # Keep score within range
+    tvl_score = float(np.clip(tvl_score, 2.0, 40.0))
+    return tvl_score
+
+    tvl_score = compute_tvl_score(tvl_usd)
     risk_score += tvl_score
 
     # APY level volatility component (0–30)
@@ -69,7 +85,7 @@ def compute_risk_metrics(history_df, tvl_usd):
     elif apy_level_vol <= 5:
         level_score = 15
     elif apy_level_vol <= 10:
-        level_score = 22
+        level_score = 25
     else:
         level_score = 30
     risk_score += level_score
@@ -91,7 +107,7 @@ def compute_risk_metrics(history_df, tvl_usd):
     if mean_apy is None or np.isnan(mean_apy):
         apy_score = 5
     elif mean_apy <= 4:
-        apy_score = 0      # low/“stable” yield
+        apy_score = 0
     elif mean_apy <= 10:
         apy_score = 8
     else:
