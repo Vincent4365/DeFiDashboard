@@ -41,39 +41,72 @@ def compute_risk_metrics(history_df, tvl_usd):
     hist["apy_change"] = hist["apy"].pct_change()
     apy_change_vol = hist["apy_change"].std()
     if apy_change_vol is not None and not np.isnan(apy_change_vol):
-        apy_change_vol = apy_change_vol * 100  # convert to %
+        apy_change_vol = apy_change_vol * 100.0  # convert to %
     else:
         apy_change_vol = None
 
     mean_apy = hist["apy"].mean()
 
-    # Simple numeric risk score (0–100)
-    risk_score = 30  # baseline
+    # ---------- Improved numeric risk score (0–100) ----------
+    risk_score = 0
 
-    if tvl_usd < 5_000_000:
-        risk_score += 15
-    if tvl_usd < 1_000_000:
-        risk_score += 15
-    if mean_apy is not None and mean_apy > 20:
-        risk_score += 10
-    if apy_level_vol is not None and not np.isnan(apy_level_vol) and apy_level_vol > 5:
-        risk_score += 10
-    if apy_change_vol is not None and apy_change_vol > 25:
-        risk_score += 20
+    # TVL component (0 = safest, up to 30 = riskiest)
+    if tvl_usd >= 200_000_000:
+        tvl_score = 5
+    elif tvl_usd >= 50_000_000:
+        tvl_score = 10
+    elif tvl_usd >= 10_000_000:
+        tvl_score = 20
+    else:
+        tvl_score = 30
+    risk_score += tvl_score
+
+    # APY level volatility component (0–30)
+    if apy_level_vol is None or np.isnan(apy_level_vol):
+        level_score = 10
+    elif apy_level_vol <= 2:
+        level_score = 5
+    elif apy_level_vol <= 5:
+        level_score = 15
+    elif apy_level_vol <= 10:
+        level_score = 22
+    else:
+        level_score = 30
+    risk_score += level_score
+
+    # APY change volatility component (0–25)
+    if apy_change_vol is None or np.isnan(apy_change_vol):
+        change_score = 10
+    elif apy_change_vol <= 10:
+        change_score = 5
+    elif apy_change_vol <= 25:
+        change_score = 15
+    elif apy_change_vol <= 50:
+        change_score = 20
+    else:
+        change_score = 25
+    risk_score += change_score
+
+    # Mean APY component (0–15); higher APY = more risk
+    if mean_apy is None or np.isnan(mean_apy):
+        apy_score = 5
+    elif mean_apy <= 4:
+        apy_score = 0      # low/“stable” yield
+    elif mean_apy <= 10:
+        apy_score = 8
+    else:
+        apy_score = 15
+    risk_score += apy_score
 
     risk_score = max(0, min(100, risk_score))
 
-    # Text risk flag
-    if tvl_usd < 1_000_000 and mean_apy > 15:
-        risk_flag = "⚠️ Very high APY + low TVL (high risk)"
-    elif apy_change_vol is not None and apy_change_vol > 25:
-        risk_flag = "⚠️ Highly unstable APY (large jumps)"
-    elif apy_level_vol is not None and not np.isnan(apy_level_vol) and apy_level_vol > 5:
-        risk_flag = "⚠️ Highly volatile APY"
-    elif tvl_usd < 5_000_000:
-        risk_flag = "⚠️ Low liquidity (low TVL)"
+    # Risk flag from score
+    if risk_score < 35:
+        risk_flag = "✅ Overall low risk (large TVL / relatively stable APY)"
+    elif risk_score < 65:
+        risk_flag = "⚠️ Medium risk (moderate volatility and/or mid TVL)"
     else:
-        risk_flag = "✅ Moderate risk based on simple rules"
+        risk_flag = "⚠️ High risk (low liquidity and/or highly volatile APY)"
 
     return apy_level_vol, apy_change_vol, risk_flag, risk_score
 
@@ -148,13 +181,17 @@ def basic_risk_flag(row):
     if pd.isna(apy_val) or pd.isna(tvl):
         return "Unknown"
 
+    # New: very large TVL + low APY → Low risk
+    if tvl > 100_000_000 and apy_val < 4:
+        return "Low"
+
     if tvl < 1_000_000 and apy_val > 15:
         return "Very High"
     elif tvl < 5_000_000:
         return "High"
     elif apy_val > 20:
         return "High"
-    elif apy_val < 3 and tvl > 20_000_000:
+    elif apy_val < 4 and tvl > 20_000_000:
         return "Low"
     else:
         return "Medium"
@@ -167,6 +204,12 @@ if not filtered_df.empty:
     sorted_df = filtered_df[
         ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag"]
     ].sort_values(by="apy", ascending=False)
+
+    # Rename only for display
+    sorted_df = sorted_df.rename(columns={
+    "tvlUsd": "Total Liquidity",
+    "riskFlag": "Risk Level"
+    })
 
     styled_df = (
         sorted_df.style.map(color_tvls, subset=["tvlUsd"])
