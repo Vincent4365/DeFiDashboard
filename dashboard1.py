@@ -49,7 +49,61 @@ def compute_risk_metrics(history_df, tvl_usd):
 
     risk_score = 0
 
-# TVL component (2-40) of risk score, where higher risk is assigned to lower TVL value
+    # 👉 TVL component
+    tvl_score = compute_tvl_score(tvl_usd)
+    risk_score += tvl_score
+
+    # 👉 APY level volatility component (0–30)
+    if apy_level_vol is None or np.isnan(apy_level_vol):
+        level_score = 10
+    elif apy_level_vol <= 2:
+        level_score = 5
+    elif apy_level_vol <= 5:
+        level_score = 15
+    elif apy_level_vol <= 10:
+        level_score = 25
+    else:
+        level_score = 30
+    risk_score += level_score
+
+    # 👉 APY change volatility component (0–25)
+    if apy_change_vol is None or np.isnan(apy_change_vol):
+        change_score = 10
+    elif apy_change_vol <= 10:
+        change_score = 5
+    elif apy_change_vol <= 25:
+        change_score = 15
+    elif apy_change_vol <= 50:
+        change_score = 20
+    else:
+        change_score = 25
+    risk_score += change_score
+
+    # 👉 Mean APY component (0–15); higher APY = more risk
+    if mean_apy is None or np.isnan(mean_apy):
+        apy_score = 5
+    elif mean_apy <= 4:
+        apy_score = 0
+    elif mean_apy <= 10:
+        apy_score = 8
+    else:
+        apy_score = 15
+    risk_score += apy_score
+
+    # clamp to 0–100
+    risk_score = max(0, min(100, risk_score))
+
+    # Risk flag from score
+    if risk_score < 35:
+        risk_flag = "✅ Overall low risk (large TVL / relatively stable APY)"
+    elif risk_score < 65:
+        risk_flag = "⚠️ Medium risk (moderate volatility and/or mid TVL)"
+    else:
+        risk_flag = "⚠️ High risk (low liquidity and/or highly volatile APY)"
+
+    return apy_level_vol, apy_change_vol, risk_flag, risk_score
+
+
 def compute_tvl_score(tvl_usd: float) -> float:
     """
     TVL-based risk penalty.
@@ -59,20 +113,16 @@ def compute_tvl_score(tvl_usd: float) -> float:
     if tvl_usd is None or tvl_usd <= 0:
         return 40.0  # Treat unknown/zero TVL as extremely risky
 
-    # Avoid going below anchor
     tvl_clamped = max(tvl_usd, 500_000)
-
     log_tvl = np.log10(tvl_clamped)
 
-    # Parameters fitted so that TVL of 500k returns approximate risk of 40 and 200m as 5
     a = 116.7
     b = 13.46
 
     tvl_score = a - b * log_tvl
-
-    # Keep score within range
     tvl_score = float(np.clip(tvl_score, 2.0, 40.0))
     return tvl_score
+
 
     tvl_score = compute_tvl_score(tvl_usd)
     risk_score += tvl_score
