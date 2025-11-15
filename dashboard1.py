@@ -237,40 +237,12 @@ def color_tvls(val):
     else:
         return "color: red"
 
-
-def basic_risk_flag(row):
-    apy_val = row["apy"] if "apy" in row else None
-    tvl = row["tvlUsd"] if "tvlUsd" in row else None
-    if pd.isna(apy_val) or pd.isna(tvl):
-        return "Unknown"
-
-    try:
-        apy_val = float(apy_val)
-        tvl = float(tvl)
-    except Exception:
-        return "Unknown"
-
-    # New: very large TVL + low APY → Low risk
-    if tvl > 100_000_000 and apy_val < 4:
-        return "Low"
-
-    if tvl < 1_000_000 and apy_val > 15:
-        return "Very High"
-    elif tvl < 5_000_000:
-        return "High"
-    elif apy_val > 20:
-        return "High"
-    elif apy_val < 4 and tvl > 20_000_000:
-        return "Low"
-    else:
-        return "Medium"
-
 if not filtered_df.empty:
     filtered_df = filtered_df.copy()
-    filtered_df["riskFlag"] = filtered_df.apply(basic_risk_flag, axis=1)
 
+    # Keep pool for internal use, but we’ll drop it from the displayed table later
     sorted_df = filtered_df[
-        ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag", "pool"]
+        ["project", "chain", "symbol", "apy", "tvlUsd", "pool"]
     ].sort_values(by="apy", ascending=False)
 
     # Prefetch unique pool histories (cached by load_pool_chart) and compute metrics once
@@ -279,12 +251,16 @@ if not filtered_df.empty:
     for pid in pool_ids:
         hist = load_pool_chart(pid)
         try:
-            # Pick a sample tvl for the pool from our filtered data
+            # Pick a sample TVL for the pool from our filtered data
             tvl_row = sorted_df.loc[sorted_df["pool"] == pid, "tvlUsd"]
             tvl_val = float(tvl_row.iloc[0]) if not tvl_row.empty else 0.0
         except Exception:
             tvl_val = 0.0
-        apy_level_vol, apy_change_vol, risk_flag, risk_score = compute_risk_metrics(hist, tvl_val, baseline_apy)
+
+        apy_level_vol, apy_change_vol, risk_flag, risk_score = compute_risk_metrics(
+            hist, tvl_val, baseline_apy
+        )
+
         pool_metrics[pid] = {
             "apy_level_vol": apy_level_vol,
             "apy_change_vol": apy_change_vol,
@@ -292,9 +268,8 @@ if not filtered_df.empty:
             "risk_score": risk_score,
         }
 
-    # Map computed risk score back to rows
+    # Map computed risk score / assessment back to rows
     def _get_risk_score_for_pool(pid):
-        # treat None/NaN/empty as missing
         if pid is None or pd.isna(pid):
             return None
         return pool_metrics.get(pid, {}).get("risk_score")
@@ -304,17 +279,37 @@ if not filtered_df.empty:
             return None
         return pool_metrics.get(pid, {}).get("risk_flag")
 
-    sorted_df["Risk Score"] = sorted_df["pool"].map(lambda p: _get_risk_score_for_pool(p))
-    sorted_df["Risk Assessment"] = sorted_df["pool"].map(lambda p: _get_risk_flag_for_pool(p))
+    sorted_df["Risk Score"] = sorted_df["pool"].map(_get_risk_score_for_pool)
+    sorted_df["Risk Assessment"] = sorted_df["pool"].map(_get_risk_flag_for_pool)
 
+    # Rename TVL + basic flag for display
     sorted_df = sorted_df.rename(columns={
         "tvlUsd": "Total Liquidity",
-        "riskFlag": "Risk Level"
+        "Risk Assessment": "Risk Level",
     })
 
-    # Formatting & styling: explicit formatters, apply color only when column exists
-    styled_df = sorted_df.style.format({"apy": "{:.2f}", "Total Liquidity": "${:,.0f}"}, na_rep="N/A")
-    if "Total Liquidity" in sorted_df.columns:
+    display_cols = [
+        "project",
+        "chain",
+        "symbol",
+        "apy",
+        "Total Liquidity",
+        "Risk Level",
+        "Risk Score",
+    ]
+    display_cols = [c for c in display_cols if c in sorted_df.columns]
+    display_df = sorted_df[display_cols]
+
+    # Formatting & styling
+    styled_df = display_df.style.format(
+        {
+            "apy": "{:.2f}",
+            "Total Liquidity": "${:,.0f}",
+            "Risk Score": "{:.0f}",
+        },
+        na_rep="N/A",
+    )
+    if "Total Liquidity" in display_df.columns:
         styled_df = styled_df.applymap(color_tvls, subset=["Total Liquidity"])
 
     st.dataframe(styled_df, use_container_width=True)
