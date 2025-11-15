@@ -3,6 +3,7 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import numpy as np
+import time
 from typing import Optional, Dict, Any
 
 # Reusable session for HTTP requests
