@@ -117,16 +117,13 @@ def compute_tvl_score(tvl_usd: float) -> float:
         # Treat unknown or zero TVL as maximum risk
         return 40.0
 
-    # Avoid going below the "extremely risky" anchor
     tvl_clamped = max(tvl_usd, 500_000)
 
     log_tvl = np.log10(tvl_clamped)
 
-    # Parameters fitted so that:
-    # TVL = 500k  -> ~40
-    # TVL = 200M  -> ~5
-    a = 116.7
-    b = 13.46
+    # Parameters fitted to risk level curve
+    a = 128
+    b = 15.5
 
     tvl_score = a - b * log_tvl
 
@@ -230,6 +227,14 @@ if not filtered_df.empty:
     sorted_df = filtered_df[
         ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag"]
     ].sort_values(by="apy", ascending=False)
+
+    sorted_df["Risk Score"] = sorted_df.apply(
+    lambda row: compute_risk_metrics(
+        load_pool_chart(row["pool"]), 
+        row["tvlUsd"], 
+        baseline_apy
+    )[3],
+    axis=1
 
     # Rename only for display
     sorted_df = sorted_df.rename(columns={
