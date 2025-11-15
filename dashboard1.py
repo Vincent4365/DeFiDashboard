@@ -23,7 +23,7 @@ def load_pool_chart(pool_id):
     return df
 
 # Risk metrics based on an assigned score.
-def compute_risk_metrics(history_df, tvl_usd):
+def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
     """
     Compute simple risk metrics from historical APY and TVL.
     history_df: dataframe with 'apy' and 'timestamp'
@@ -47,62 +47,57 @@ def compute_risk_metrics(history_df, tvl_usd):
 
     mean_apy = hist["apy"].mean()
 
-    # 👉 TVL component
+    # TVL component (2-40)
     tvl_score = compute_tvl_score(tvl_usd)
 
-    # 👉 APY level volatility component (0–30)
+    # APY level volatility component (5–25)
     if apy_level_vol is None or np.isnan(apy_level_vol):
         level_score = 10
-    elif apy_level_vol <= 2:
-        level_score = 5
-    elif apy_level_vol <= 5:
-        level_score = 15
-    elif apy_level_vol <= 10:
-        level_score = 25
     else:
-        level_score = 30
+        k = 5
+        vol = max(apy_level_vol, 0)
+        level_score = 5 + 20 * (1 - np.exp(-vol / k))
 
-    # 👉 APY change volatility component (0–25)
+    # APY change volatility component (5–20)
     if apy_change_vol is None or np.isnan(apy_change_vol):
         change_score = 10
-    elif apy_change_vol <= 10:
-        change_score = 5
-    elif apy_change_vol <= 25:
-        change_score = 15
-    elif apy_change_vol <= 50:
-        change_score = 20
     else:
-        change_score = 25
+        k = 15
+        vol = max(apy_change_vol, 0)
+        change_score = 5 + 15 * (1 - np.exp(-vol / k))
 
-    # 👉 Mean APY component (0–15); higher APY = more risk
-    if mean_apy is None or np.isnan(mean_apy):
+    # Mean APY component (continuous 0–15); higher APY relative to baseline = more risk
+    if (
+        mean_apy is None
+        or np.isnan(mean_apy)
+        or baseline_apy is None
+        or np.isnan(baseline_apy)
+    ):
         apy_score = 5
-    elif mean_apy <= 4:
-        apy_score = 0
-    elif mean_apy <= 10:
-        apy_score = 8
     else:
-        apy_score = 15
+        
+        excess = max(mean_apy - baseline_apy, 0.0)
 
-    # ---------- NORMALIZE TO 0–100 ----------
+        k = 2.0
+        apy_score = 15.0 * (1.0 - np.exp(-excess / k))
+
     # Raw total from the four components
     raw_score = tvl_score + level_score + change_score + apy_score
 
-    # Theoretical min/max from your component design:
     #   tvl:   2–40
-    #   level: 5–30
-    #   change:5–25
+    #   level: 5–25
+    #   change:5–20
     #   apy:   0–15
     MIN_RAW = 12      # 2 + 5 + 5 + 0
-    MAX_RAW = 110     # 40 + 30 + 25 + 15
+    MAX_RAW = 100     # 40 + 25 + 20 + 15
 
     norm = (raw_score - MIN_RAW) / (MAX_RAW - MIN_RAW)
     norm = np.clip(norm, 0.0, 1.0)
 
     risk_score = norm * 100.0
-    risk_score = int(round(risk_score))   # 👉 always an integer 0–100
+    risk_score = int(round(risk_score))
 
-    # ---------- RISK FLAG ----------
+    # Risk flag
     if risk_score < 35:
         risk_flag = "✅ Overall low risk (large TVL / relatively stable APY)"
     elif risk_score < 65:
@@ -116,10 +111,10 @@ def compute_tvl_score(tvl_usd: float) -> float:
     """
     TVL-based risk penalty.
     Small pools get a high score (more risky), large pools get a low score.
-    Clamped between 2 and 40.
+    Ranged between 2 and 40.
     """
     if tvl_usd is None or tvl_usd <= 0:
-        # Treat unknown/zero TVL as extremely risky
+        # Treat unknown or zero TVL as maximum risk
         return 40.0
 
     # Avoid going below the "extremely risky" anchor
@@ -149,6 +144,9 @@ st.markdown(
 
 # 4. Load Data
 df = load_data()
+
+# Baseline APY from dataset
+baseline_apy = float(df["apy"].dropna().mean())
 
 # Sidebar controls
 with st.sidebar:
@@ -295,7 +293,7 @@ if not filtered_df.empty:
         # Compute risk metrics
         tvl_usd = float(selected_row.get("tvlUsd", 0) or 0)
         apy_level_vol, apy_change_vol, risk_flag, risk_score = compute_risk_metrics(
-            history_df, tvl_usd
+            history_df, tvl_usd, baseline_apy
         )
 
         col1, col2, col3, col4 = st.columns(4)
