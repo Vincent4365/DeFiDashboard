@@ -112,14 +112,14 @@ def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
         k = 2.0
         apy_score = 15.0 * (1.0 - np.exp(-excess / k))
 
-    raw_score = tvl_score + level_score + change_score + apy_score
+    raw_score = 1.5 * tvl_score + level_score + change_score + apy_score
 
     #   tvl:   2–40
     #   level: 5–25
     #   change:5–20
     #   apy:   0–15
-    MIN_RAW = 12.0      # 2 + 5 + 5 + 0
-    MAX_RAW = 100.0     # 40 + 25 + 20 + 15
+    MIN_RAW = 13.0      # 3 + 5 + 5 + 0
+    MAX_RAW = 120.0     # 60 + 25 + 20 + 15
 
     norm = (raw_score - MIN_RAW) / (MAX_RAW - MIN_RAW)
     norm = np.clip(norm, 0.0, 1.0)
