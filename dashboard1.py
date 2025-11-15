@@ -1,38 +1,76 @@
+import os
 import requests
 import pandas as pd
 import streamlit as st
 import plotly.express as px
 import numpy as np
 from typing import Optional, Dict, Any
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
-# Reusable session for HTTP requests
+# Reusable session for HTTP requests with retries
 _session = requests.Session()
 _DEFAULT_TIMEOUT = 8  # seconds
 
+# Configure retries/backoff for transient HTTP errors
+_retry_strategy = Retry(
+    total=3,
+    backoff_factor=0.5,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=frozenset(["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"])
+)
+_adapter = HTTPAdapter(max_retries=_retry_strategy)
+_session.mount("https://", _adapter)
+_session.mount("http://", _adapter)
+
 def _get_json(url: str, timeout: int = _DEFAULT_TIMEOUT) -> Optional[Dict[str, Any]]:
     """
-    GET JSON with a shared session, robust to network errors and unexpected structures.
-    Returns the parsed JSON dict on success, otherwise None.
+    GET JSON with a shared session, tolerant to several payload shapes:
+    - {"data": [...]}
+    - [...]
+    Returns a dict with "data" key on success, else None.
+    Surfaces simple Streamlit warnings when payloads are unexpected.
     """
     try:
         resp = _session.get(url, timeout=timeout)
-        resp.raise_for_status()
+        status = resp.status_code
+        # Keep some visible debug output so failures are not silent
+        if status != 200:
+            st.warning(f"GET {url} returned HTTP {status}")
+        # Try parse JSON
         data = resp.json()
-        if not isinstance(data, dict) or "data" not in data:
-            return None
-        return data
-    except requests.RequestException:
+        # Case 1: dict with "data" key (expected)
+        if isinstance(data, dict) and "data" in data:
+            return data
+        # Case 2: endpoint returns a plain list -> wrap into {"data": list}
+        if isinstance(data, list):
+            return {"data": data}
+        # Unexpected shape: log a truncated version for debugging
+        try:
+            truncated = str(data)[:1000]
+        except Exception:
+            truncated = "<unprintable payload>"
+        st.warning(f"Unexpected JSON payload from {url}: {truncated}")
+        return None
+    except requests.RequestException as e:
+        st.warning(f"Request error for {url}: {e}")
+        return None
+    except ValueError as e:
+        st.warning(f"JSON decode error for {url}: {e}")
         return None
 
 # Data loading with Streamlit caching (auto-refresh every 3600s)
-# Source: DefiLlama yields and historical APY data
 @st.cache_data(ttl=3600)
 def load_data() -> pd.DataFrame:
     url = "https://yields.llama.fi/pools"
     data = _get_json(url)
     if not data or "data" not in data:
         return pd.DataFrame()
-    df = pd.json_normalize(data["data"])
+    # dataset is often a list of flat dicts: normalize just in case
+    try:
+        df = pd.json_normalize(data["data"])
+    except Exception:
+        df = pd.DataFrame(data["data"])
     return df
 
 @st.cache_data(ttl=3600)
@@ -43,7 +81,28 @@ def load_pool_chart(pool_id: str) -> pd.DataFrame:
     data = _get_json(url)
     if not data or "data" not in data:
         return pd.DataFrame()
-    return pd.DataFrame(data["data"])
+    raw = data["data"]
+    # Data could be list of primitives or nested dicts; normalize to DataFrame
+    try:
+        df = pd.json_normalize(raw)
+    except Exception:
+        try:
+            df = pd.DataFrame(raw)
+        except Exception:
+            return pd.DataFrame()
+    # Ensure typical columns are available; try some common alternatives
+    # If 'apy' is nested (e.g., 'metrics.apy'), flatten will have created that column name already via json_normalize.
+    if "apy" not in df.columns:
+        # try to find a numeric-looking column and rename it to 'apy' as a fallback
+        numeric_cols = [c for c in df.columns if df[c].dtype.kind in "fi"]
+        # prefer columns that contain 'apy' or 'rate' in their name
+        cand = [c for c in numeric_cols if "apy" in c.lower() or "rate" in c.lower()]
+        if cand:
+            df = df.rename(columns={cand[0]: "apy"})
+        else:
+            # nothing to do; let caller handle empty apy
+            pass
+    return df
 
 # Risk metrics based on an assigned score.
 def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
@@ -55,23 +114,39 @@ def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
     if history_df is None or not isinstance(history_df, pd.DataFrame) or history_df.empty:
         return None, None, None, None
 
-    if "apy" not in history_df.columns or history_df["apy"].dropna().shape[0] < 2:
+    # Ensure 'apy' column exists and has at least one non-NA value
+    if "apy" not in history_df.columns:
         return None, None, None, None
+
+    apy_non_na = history_df["apy"].dropna()
+    if apy_non_na.shape[0] == 0:
+        return None, None, None, None
+
+    # If only a single APY observation, provide reasonable fallbacks instead of bailing out.
+    single_point = False
+    if apy_non_na.shape[0] == 1:
+        single_point = True
 
     hist = history_df.dropna(subset=["apy"]).copy()
 
+    # Optional: sort by timestamp if present
+    if "timestamp" in hist.columns:
+        try:
+            hist = hist.sort_values("timestamp")
+        except Exception:
+            pass
+
     # Volatility of APY level (% points)
     try:
-        apy_level_vol = float(hist["apy"].std())
+        apy_level_vol = float(hist["apy"].std()) if not single_point else 0.0
     except Exception:
         apy_level_vol = None
 
     # Volatility of APY changes (day-to-day jumps, % change)
-    if "timestamp" in hist.columns:
-        hist = hist.sort_values("timestamp")
     hist["apy_change"] = hist["apy"].pct_change()
     try:
-        apy_change_vol = float(hist["apy_change"].std())
+        # For single point, pct_change yields NaN; treat as 0.0 for reporting but we keep None semantics where appropriate
+        apy_change_vol = float(hist["apy_change"].std()) if not single_point else 0.0
         if not np.isnan(apy_change_vol):
             apy_change_vol = apy_change_vol * 100.0  # convert to %
         else:
@@ -151,6 +226,7 @@ def compute_tvl_score(tvl_usd: float) -> float:
         # Treat unknown or zero TVL as maximum risk
         return 40.0
 
+    # Ensure a minimum scale so tiny tvl doesn't blow up the log
     tvl_clamped = max(tvl_usd, 500_000)
 
     log_tvl = np.log10(tvl_clamped)
@@ -165,24 +241,31 @@ def compute_tvl_score(tvl_usd: float) -> float:
     tvl_score = float(np.clip(tvl_score, 2.0, 40.0))
     return tvl_score
 
-# App
-
+# App UI
 st.title("DeFi Lending Rates")
 st.markdown(
     "Real-time DeFi lending rates with simple risk metrics based on APY volatility and TVL. "
     "Data source: DefiLlama."
 )
 
+# Sidebar: debug toggle + filters
+with st.sidebar:
+    st.header("Controls")
+    debug_toggle = st.checkbox("Show debug logs", value=False)
+    st.info("Enable 'Show debug logs' to expose API payload warnings in the UI (useful for debugging).")
+
 # 4. Load Data
+# If you want to clear cached results during debugging uncomment the next line:
+# st.cache_data.clear()
+
 df = load_data()
 
 # Baseline APY from dataset
 baseline_apy = float(df["apy"].dropna().mean()) if "apy" in df.columns and not df["apy"].dropna().empty else 0.0
 
-# Sidebar controls
+# Sidebar filters (moved out of previous ordering for clarity)
 with st.sidebar:
     st.header("Filters")
-
     tokens = df["symbol"].dropna().unique() if "symbol" in df.columns else []
     token_choice = st.multiselect(
         "Tokens",
@@ -222,7 +305,6 @@ if platform_choice:
 # 7. Display DataFrame sorted by APY
 st.header("Lending Pools Data")
 
-
 def color_tvls(val):
     try:
         v = float(val)
@@ -240,26 +322,38 @@ def color_tvls(val):
 if not filtered_df.empty:
     filtered_df = filtered_df.copy()
 
-    # Keep pool for internal use, but we’ll drop it from the displayed table later
     sorted_df = filtered_df[
         ["project", "chain", "symbol", "apy", "tvlUsd", "pool"]
     ].sort_values(by="apy", ascending=False)
 
-    # Prefetch unique pool histories (cached by load_pool_chart) and compute metrics once
     pool_ids = sorted_df["pool"].dropna().unique().tolist() if "pool" in sorted_df.columns else []
     pool_metrics = {}
     for pid in pool_ids:
         hist = load_pool_chart(pid)
-        try:
-            # Pick a sample TVL for the pool from our filtered data
+        if hist is None or hist.empty:
+            if debug_toggle:
+                st.write(f"No history DataFrame for pool {pid} (empty or missing).")
             tvl_row = sorted_df.loc[sorted_df["pool"] == pid, "tvlUsd"]
-            tvl_val = float(tvl_row.iloc[0]) if not tvl_row.empty else 0.0
-        except Exception:
-            tvl_val = 0.0
+            try:
+                tvl_val = float(tvl_row.iloc[0]) if not tvl_row.empty else 0.0
+            except Exception:
+                tvl_val = 0.0
+            # compute risk metrics with no history will return None values
+            apy_level_vol, apy_change_vol, risk_flag, risk_score = compute_risk_metrics(pd.DataFrame(), tvl_val, baseline_apy)
+        else:
+            # confirm we have expected columns (debug)
+            if debug_toggle:
+                st.write(f"Pool {pid} history columns:", hist.columns.tolist())
+                st.write(f"Pool {pid} sample rows:", hist.head(3).to_dict(orient='records'))
+            try:
+                tvl_row = sorted_df.loc[sorted_df["pool"] == pid, "tvlUsd"]
+                tvl_val = float(tvl_row.iloc[0]) if not tvl_row.empty else 0.0
+            except Exception:
+                tvl_val = 0.0
 
-        apy_level_vol, apy_change_vol, risk_flag, risk_score = compute_risk_metrics(
-            hist, tvl_val, baseline_apy
-        )
+            apy_level_vol, apy_change_vol, risk_flag, risk_score = compute_risk_metrics(
+                hist, tvl_val, baseline_apy
+            )
 
         pool_metrics[pid] = {
             "apy_level_vol": apy_level_vol,
@@ -268,7 +362,6 @@ if not filtered_df.empty:
             "risk_score": risk_score,
         }
 
-    # Map computed risk score / assessment back to rows
     def _get_risk_score_for_pool(pid):
         if pid is None or pd.isna(pid):
             return None
@@ -282,7 +375,6 @@ if not filtered_df.empty:
     sorted_df["Risk Score"] = sorted_df["pool"].map(_get_risk_score_for_pool)
     sorted_df["Risk Assessment"] = sorted_df["pool"].map(_get_risk_flag_for_pool)
 
-    # Rename TVL + basic flag for display
     sorted_df = sorted_df.rename(columns={
         "tvlUsd": "Total Liquidity",
         "Risk Assessment": "Risk Level",
@@ -300,7 +392,6 @@ if not filtered_df.empty:
     display_cols = [c for c in display_cols if c in sorted_df.columns]
     display_df = sorted_df[display_cols]
 
-    # Formatting & styling
     styled_df = display_df.style.format(
         {
             "apy": "{:.2f}",
@@ -315,7 +406,7 @@ if not filtered_df.empty:
     st.dataframe(styled_df, use_container_width=True)
 else:
     st.warning("No pools match your filters. Try selecting more tokens or platforms.")
-  
+
 # 8. Simulate Earnings
 st.header("Simulate earnings")
 
@@ -323,7 +414,6 @@ if not filtered_df.empty:
     amount = st.number_input("Amount to lend (USD)", value=1000)
     days = st.slider("Duration (days)", 1, 365, 30)
 
-    # Build labels and parallel list of pool ids to avoid mismatch
     def _label(row):
         proj = str(row.get("project", ""))
         chain = str(row.get("chain", ""))
@@ -357,11 +447,17 @@ if not filtered_df.empty:
 
         if history_df.empty or "timestamp" not in history_df.columns or "apy" not in history_df.columns:
             st.info("No historical data available for this pool.")
+            if debug_toggle:
+                st.write("history_df empty or missing expected columns:", history_df.shape, history_df.columns.tolist())
         else:
             # Robust timestamp conversion
             try:
                 if np.issubdtype(history_df["timestamp"].dtype, np.number):
-                    history_df["timestamp"] = pd.to_datetime(history_df["timestamp"], unit="s", errors="coerce")
+                    # Try seconds first; if resulting dates are all in the far past/future, try milliseconds
+                    conv = pd.to_datetime(history_df["timestamp"], unit="s", errors="coerce")
+                    if conv.dropna().empty:
+                        conv = pd.to_datetime(history_df["timestamp"], unit="ms", errors="coerce")
+                    history_df["timestamp"] = conv
                 else:
                     history_df["timestamp"] = pd.to_datetime(history_df["timestamp"], errors="coerce")
             except Exception:
@@ -369,12 +465,10 @@ if not filtered_df.empty:
 
             history_df = history_df.dropna(subset=["timestamp"])
 
-            # Try to reuse precomputed metrics from pool_metrics (computed earlier for the table).
             metrics = None
             if 'pool_metrics' in locals() and pool_id is not None and not pd.isna(pool_id):
                 metrics = pool_metrics.get(pool_id)
 
-            # Fallback: compute metrics if not found (safe and cached functions)
             if metrics is None:
                 tvl_usd = float(selected_row.get("tvlUsd", 0) or 0)
                 apy_level_vol, apy_change_vol, risk_flag, risk_score = compute_risk_metrics(history_df, tvl_usd, baseline_apy)
