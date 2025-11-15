@@ -170,11 +170,11 @@ with st.sidebar:
     )
 
     benchmark_rate = st.slider(
-        "Benchmark rate (e.g. T-bill yield, %)",
+        "Benchmark rate (%)",
         min_value=0.0,
         max_value=10.0,
         value=4.0,
-        step=0.25,
+        step=0.01,
     )
 
 # Filter Data
