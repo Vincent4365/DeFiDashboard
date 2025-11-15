@@ -241,7 +241,6 @@ def color_tvls(val):
 if not filtered_df.empty:
     filtered_df = filtered_df.copy()
 
-    # Keep pool for internal use, but we’ll drop it from the displayed table later
     sorted_df = filtered_df[
         ["project", "chain", "symbol", "apy", "tvlUsd", "pool"]
     ].sort_values(by="apy", ascending=False)
