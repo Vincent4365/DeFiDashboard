@@ -248,8 +248,9 @@ if not filtered_df.empty:
     # Prefetch unique pool histories (cached by load_pool_chart) and compute metrics once
     pool_ids = sorted_df["pool"].dropna().unique().tolist() if "pool" in sorted_df.columns else []
     pool_metrics = {}
-    for pid in pool_ids:
-        hist = load_pool_chart(pid)
+        for pid in pool_ids:
+            time.sleep(0.20)  # prevents 429 rate-limits
+            hist = load_pool_chart(pid)
         try:
             # Pick a sample TVL for the pool from our filtered data
             tvl_row = sorted_df.loc[sorted_df["pool"] == pid, "tvlUsd"]
