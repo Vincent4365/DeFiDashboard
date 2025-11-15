@@ -219,7 +219,7 @@ def tvl_risk(tvl):
         
 if not filtered_df.empty:
     filtered_df = filtered_df.copy()
-    filtered_df["riskFlag"] = filtered_df.apply(tvl_risk, axis=1)
+    filtered_df["riskFlag"] = filtered_df["tvlUsd"].apply(tvl_risk)
 
     sorted_df = filtered_df[
         ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag"]
