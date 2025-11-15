@@ -1,4 +1,5 @@
 import requests
+import json
 import pandas as pd
 import streamlit as st
 import plotly.express as px
@@ -17,10 +18,21 @@ def load_data():
 @st.cache_data(ttl=3600)
 def load_pool_chart(pool_id):
     url = f"https://yields.llama.fi/chart/{pool_id}"
-    response = requests.get(url)
-    data = response.json()
-    df = pd.DataFrame(data["data"])
-    return df
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()  # raise if non-200
+
+        # Try to parse JSON safely
+        data = response.json()
+        if not isinstance(data, dict) or "data" not in data:
+            # Unexpected structure → return empty
+            return pd.DataFrame()
+
+        return pd.DataFrame(data["data"])
+
+    except (requests.RequestException, json.JSONDecodeError, ValueError):
+        # Network error, non-JSON, or bad format → return empty df
+        return pd.DataFrame()
 
 # Risk metrics based on an assigned score.
 def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
@@ -219,32 +231,32 @@ def basic_risk_flag(row):
     else:
         return "Medium"
 
+def get_risk_score_for_row(row):
+    """Helper to compute a single row's risk score for the table."""
+    hist_df = load_pool_chart(row["pool"])
+    _, _, _, score = compute_risk_metrics(
+        hist_df,
+        row["tvlUsd"],
+        baseline_apy,
+    )
+    return score
+
 if not filtered_df.empty:
     filtered_df = filtered_df.copy()
     filtered_df["riskFlag"] = filtered_df.apply(basic_risk_flag, axis=1)
 
-    # Include "pool" so we can compute risk score
     sorted_df = filtered_df[
         ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag", "pool"]
     ].sort_values(by="apy", ascending=False)
 
-    # Compute Risk Score for each row (slow but fine for testing)
-    sorted_df["Risk Score"] = sorted_df.apply(
-        lambda row: compute_risk_metrics(
-            load_pool_chart(row["pool"]),
-            row["tvlUsd"],
-            baseline_apy,
-        )[3],
-        axis=1,
-    )
+    # Use helper to compute risk score per row
+    sorted_df["Risk Score"] = sorted_df.apply(get_risk_score_for_row, axis=1)
 
-    # Rename only for display
     sorted_df = sorted_df.rename(columns={
         "tvlUsd": "Total Liquidity",
         "riskFlag": "Risk Level"
     })
 
-    # Color styling
     styled_df = (
         sorted_df.style
         .map(color_tvls, subset=["Total Liquidity"])
@@ -252,10 +264,9 @@ if not filtered_df.empty:
     )
 
     st.dataframe(styled_df, width="stretch")
-
 else:
     st.warning("No pools match your filters. Try selecting more tokens or platforms.")
-
+  
 # 8. Simulate Earnings
 st.header("Simulate earnings")
 
