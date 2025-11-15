@@ -136,7 +136,6 @@ st.markdown(
 )
 
 df = load_data()
-st.write("DEBUG TVL:", df["tvlUsd"].head())
 
 # Baseline APY from dataset
 baseline_apy = (
@@ -193,14 +192,15 @@ def color_tvls(val):
         v = float(val)
     except Exception:
         return ""
+
     if v > 50_000_000:
-        return "color: green"
+        return "color: green"          # Low risk
     elif v > 10_000_000:
-        return "color: darkorange"
+        return "color: goldenrod"      # Medium
     elif v > 1_000_000:
-        return "color: orange"
+        return "color: orangered"      # High
     else:
-        return "color: red"
+        return "color: red"            # Very High
 
 def tvl_risk(tvl):
     try:
