@@ -204,7 +204,7 @@ def basic_risk_flag(row):
     if pd.isna(apy_val) or pd.isna(tvl):
         return "Unknown"
 
-    # New: very large TVL + low APY → Low risk
+    # Very large TVL + low APY → Low risk
     if tvl > 100_000_000 and apy_val < 4:
         return "Low"
 
@@ -228,31 +228,23 @@ if not filtered_df.empty:
         ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag"]
     ].sort_values(by="apy", ascending=False)
 
-    sorted_df["Risk Score"] = sorted_df.apply(
-    lambda row: compute_risk_metrics(
-        load_pool_chart(row["pool"]), 
-        row["tvlUsd"], 
-        baseline_apy
-    )[3],
-    axis=1
-
     # Rename only for display
     sorted_df = sorted_df.rename(columns={
         "tvlUsd": "Total Liquidity",
-        "riskFlag": "Risk Level"
+        "riskFlag": "Risk Level",
     })
 
-    # IMPORTANT: use the *new* column name in subset + format
+    # Style the table
     styled_df = (
         sorted_df.style
         .map(color_tvls, subset=["Total Liquidity"])
         .format({"apy": "{:.2f}", "Total Liquidity": "${:,.0f}"})
     )
 
-    st.dataframe(styled_df, width="stretch")
+    st.dataframe(styled_df, use_container_width=True)
 else:
     st.warning("No pools match your filters. Try selecting more tokens or platforms.")
-
+    
 # 8. Simulate Earnings
 st.header("Simulate earnings")
 
