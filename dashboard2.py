@@ -142,21 +142,25 @@ st.markdown(
 # 4. Load Data
 df = load_data()
 
-# Baseline APY from dataset
-baseline_apy = float(df["apy"].dropna().mean())
+# Baseline APY from dataset (safer if column is missing/empty)
+baseline_apy = (
+    float(df["apy"].dropna().mean())
+    if "apy" in df.columns and not df["apy"].dropna().empty
+    else 0.0
+)
 
 # Sidebar controls
 with st.sidebar:
     st.header("Filters")
 
-    tokens = df["symbol"].dropna().unique()
+    tokens = df["symbol"].dropna().unique() if "symbol" in df.columns else []
     token_choice = st.multiselect(
         "Tokens",
         options=sorted(tokens),
-        default=["USDC", "USDT", "DAI"],
+        default=[t for t in ["USDC", "USDT", "DAI"] if t in tokens],
     )
 
-    platforms = df["project"].dropna().unique()
+    platforms = df["project"].dropna().unique() if "project" in df.columns else []
     platforms = sorted(platforms)
 
     default_platforms = []
@@ -179,24 +183,28 @@ with st.sidebar:
     )
 
 # 6. Filter Data
-filtered_df = df[
-    (df["symbol"].isin(token_choice)) & (df["project"].isin(platform_choice))
-]
+filtered_df = df.copy()
+if token_choice:
+    filtered_df = filtered_df[filtered_df["symbol"].isin(token_choice)]
+if platform_choice:
+    filtered_df = filtered_df[filtered_df["project"].isin(platform_choice)]
 
 # 7. Display DataFrame sorted by APY
 st.header("Lending Pools Data")
 
-
 def color_tvls(val):
-    if val > 50_000_000:
+    try:
+        v = float(val)
+    except Exception:
+        return ""
+    if v > 50_000_000:
         return "color: green"
-    elif val > 10_000_000:
-        return "color: yellow"
-    elif val > 1_000_000:
+    elif v > 10_000_000:
+        return "color: darkorange"
+    elif v > 1_000_000:
         return "color: orange"
     else:
         return "color: red"
-
 
 def basic_risk_flag(row):
     apy_val = row["apy"]
