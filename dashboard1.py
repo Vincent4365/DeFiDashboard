@@ -250,10 +250,10 @@ if not filtered_df.empty:
     pool_metrics = {}
     
     for pid in pool_ids:
-            time.sleep(0.20)  # prevents 429 rate-limits
-            hist = load_pool_chart(pid)
+        time.sleep(0.20)  # prevents 429 rate-limits
+        hist = load_pool_chart(pid)
+        
         try:
-            # Pick a sample TVL for the pool from our filtered data
             tvl_row = sorted_df.loc[sorted_df["pool"] == pid, "tvlUsd"]
             tvl_val = float(tvl_row.iloc[0]) if not tvl_row.empty else 0.0
         except Exception:
