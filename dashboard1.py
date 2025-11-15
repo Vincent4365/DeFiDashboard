@@ -112,7 +112,33 @@ def compute_risk_metrics(history_df, tvl_usd):
 
     return apy_level_vol, apy_change_vol, risk_flag, risk_score
 
+def compute_tvl_score(tvl_usd: float) -> float:
+    """
+    TVL-based risk penalty.
+    Small pools get a high score (more risky), large pools get a low score.
+    Clamped between 2 and 40.
+    """
+    if tvl_usd is None or tvl_usd <= 0:
+        # Treat unknown/zero TVL as extremely risky
+        return 40.0
 
+    # Avoid going below the "extremely risky" anchor
+    tvl_clamped = max(tvl_usd, 500_000)
+
+    log_tvl = np.log10(tvl_clamped)
+
+    # Parameters fitted so that:
+    # TVL = 500k  -> ~40
+    # TVL = 200M  -> ~5
+    a = 116.7
+    b = 13.46
+
+    tvl_score = a - b * log_tvl
+
+    # Keep score within range
+    tvl_score = float(np.clip(tvl_score, 2.0, 40.0))
+    return tvl_score
+    
 # App
 
 st.title("DeFi Lending Rates")
