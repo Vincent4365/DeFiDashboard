@@ -136,6 +136,7 @@ st.markdown(
 )
 
 df = load_data()
+st.write("DEBUG TVL:", df["tvlUsd"].head())
 
 # Baseline APY from dataset
 baseline_apy = (
