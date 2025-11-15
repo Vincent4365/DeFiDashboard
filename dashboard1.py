@@ -224,9 +224,9 @@ if not filtered_df.empty:
     filtered_df = filtered_df.copy()
     filtered_df["riskFlag"] = filtered_df.apply(basic_risk_flag, axis=1)
 
-    sorted_df = filtered_df[
-        ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag"]
-    ].sort_values(by="apy", ascending=False)
+sorted_df = filtered_df[
+    ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag", "pool"]
+].sort_values(by="apy", ascending=False)
 
     sorted_df["Risk Score"] = sorted_df.apply(
     lambda row: compute_risk_metrics(
@@ -235,6 +235,7 @@ if not filtered_df.empty:
         baseline_apy
     )[3],
     axis=1
+  )
 
     # Rename only for display
     sorted_df = sorted_df.rename(columns={
