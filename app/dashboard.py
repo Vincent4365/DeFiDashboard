@@ -22,10 +22,10 @@ def load_pool_chart(pool_id):
     df = pd.DataFrame(data["data"])
     return df
 
-# Risk metrics based on an assigned score.
+# Risk metrics based on an assigned score
 def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
     """
-    Compute simple risk metrics from historical APY and TVL.
+    Compute risk metrics from historical APY and TVL.
     history_df: dataframe with 'apy' and 'timestamp'
     tvl_usd: current TVL in USD (float)
     """
@@ -41,7 +41,7 @@ def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
     hist["apy_change"] = hist["apy"].pct_change()
     apy_change_vol = hist["apy_change"].std()
     if apy_change_vol is not None and not np.isnan(apy_change_vol):
-        apy_change_vol = apy_change_vol * 100.0  # convert to %
+        apy_change_vol = apy_change_vol * 100.0
     else:
         apy_change_vol = None
 
@@ -66,7 +66,7 @@ def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
         vol = max(apy_change_vol, 0)
         change_score = 5 + 15 * (1 - np.exp(-vol / k))
 
-    # Mean APY component (continuous 0–15); higher APY relative to baseline = more risk
+    # Mean APY component
     if (
         mean_apy is None
         or np.isnan(mean_apy)
@@ -84,10 +84,6 @@ def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
     # Raw total from the four components
     raw_score = tvl_score + level_score + change_score + apy_score
 
-    #   tvl:   2–40
-    #   level: 5–25
-    #   change:5–20
-    #   apy:   0–15
     MIN_RAW = 12      # 2 + 5 + 5 + 0
     MAX_RAW = 100     # 40 + 25 + 20 + 15
 
@@ -139,10 +135,9 @@ st.markdown(
     "Data source: DefiLlama."
 )
 
-# 4. Load Data
 df = load_data()
 
-# Baseline APY from dataset (safer if column is missing/empty)
+# Baseline APY from dataset
 baseline_apy = (
     float(df["apy"].dropna().mean())
     if "apy" in df.columns and not df["apy"].dropna().empty
@@ -182,14 +177,14 @@ with st.sidebar:
         step=0.25,
     )
 
-# 6. Filter Data
+# Filter Data
 filtered_df = df.copy()
 if token_choice:
     filtered_df = filtered_df[filtered_df["symbol"].isin(token_choice)]
 if platform_choice:
     filtered_df = filtered_df[filtered_df["project"].isin(platform_choice)]
 
-# 7. Display DataFrame sorted by APY
+# Display DataFrame sorted by APY
 st.header("Lending Pools Data")
 
 def color_tvls(val):
@@ -206,31 +201,24 @@ def color_tvls(val):
     else:
         return "color: red"
 
-def basic_risk_flag(row):
-    apy_val = row["apy"]
-    tvl = row["tvlUsd"]
-    if pd.isna(apy_val) or pd.isna(tvl):
+def tvl_risk(tvl):
+    try:
+        v = float(tvl)
+    except:
         return "Unknown"
 
-    # Very large TVL + low APY → Low risk
-    if tvl > 100_000_000 and apy_val < 4:
+    if v > 50_000_000:
         return "Low"
-
-    if tvl < 1_000_000 and apy_val > 15:
-        return "Very High"
-    elif tvl < 5_000_000:
-        return "High"
-    elif apy_val > 20:
-        return "High"
-    elif apy_val < 4 and tvl > 20_000_000:
-        return "Low"
-    else:
+    elif v > 10_000_000:
         return "Medium"
-
-
+    elif v > 1_000_000:
+        return "High"
+    else:
+        return "Very High"
+        
 if not filtered_df.empty:
     filtered_df = filtered_df.copy()
-    filtered_df["riskFlag"] = filtered_df.apply(basic_risk_flag, axis=1)
+    filtered_df["riskFlag"] = filtered_df.apply(tvl_risk, axis=1)
 
     sorted_df = filtered_df[
         ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag"]
@@ -239,7 +227,7 @@ if not filtered_df.empty:
     # Rename only for display
     sorted_df = sorted_df.rename(columns={
         "tvlUsd": "Total Liquidity",
-        "riskFlag": "Risk Level",
+        "riskFlag": "TVL Risk",
     })
 
     # Style the table
@@ -253,7 +241,7 @@ if not filtered_df.empty:
 else:
     st.warning("No pools match your filters. Try selecting more tokens or platforms.")
     
-# 8. Simulate Earnings
+# Simulate Earnings
 st.header("Simulate earnings")
 
 if not filtered_df.empty:
@@ -275,14 +263,14 @@ if not filtered_df.empty:
 
     st.metric(label="Estimated Earnings ($)", value=f"{earnings:.2f}")
 
-    # 9. Historical APY Chart + Risk Metrics
+    # Historical APY Chart + Risk Metrics
     st.header("Historical APY & Risk Metrics")
 
     pool_id = selected_row["pool"]
     history_df = load_pool_chart(pool_id)
 
     if not history_df.empty and "timestamp" in history_df.columns:
-        # Robust timestamp conversion (force datetime)
+        # Timestamp conversion
         if np.issubdtype(history_df["timestamp"].dtype, np.number):
             history_df["timestamp"] = pd.to_datetime(
                 history_df["timestamp"], unit="s", errors="coerce"
@@ -314,7 +302,7 @@ if not filtered_df.empty:
             if risk_score is not None:
                 st.metric("Risk Score (0–100)", f"{risk_score:.0f}")
 
-        # 30-day summary stats (now safe: timestamp is datetime)
+        # 30-day summary stats
         if not history_df.empty:
             max_ts = history_df["timestamp"].max()
             if pd.notna(max_ts):
