@@ -219,23 +219,24 @@ def basic_risk_flag(row):
     else:
         return "Medium"
 
-
 if not filtered_df.empty:
     filtered_df = filtered_df.copy()
     filtered_df["riskFlag"] = filtered_df.apply(basic_risk_flag, axis=1)
 
-sorted_df = filtered_df[
-    ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag", "pool"]
-].sort_values(by="apy", ascending=False)
+    # Include "pool" so we can compute risk score
+    sorted_df = filtered_df[
+        ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag", "pool"]
+    ].sort_values(by="apy", ascending=False)
 
+    # Compute Risk Score for each row (slow but fine for testing)
     sorted_df["Risk Score"] = sorted_df.apply(
-    lambda row: compute_risk_metrics(
-        load_pool_chart(row["pool"]), 
-        row["tvlUsd"], 
-        baseline_apy
-    )[3],
-    axis=1
-  )
+        lambda row: compute_risk_metrics(
+            load_pool_chart(row["pool"]),
+            row["tvlUsd"],
+            baseline_apy,
+        )[3],
+        axis=1,
+    )
 
     # Rename only for display
     sorted_df = sorted_df.rename(columns={
@@ -243,7 +244,7 @@ sorted_df = filtered_df[
         "riskFlag": "Risk Level"
     })
 
-    # IMPORTANT: use the *new* column name in subset + format
+    # Color styling
     styled_df = (
         sorted_df.style
         .map(color_tvls, subset=["Total Liquidity"])
@@ -251,6 +252,7 @@ sorted_df = filtered_df[
     )
 
     st.dataframe(styled_df, width="stretch")
+
 else:
     st.warning("No pools match your filters. Try selecting more tokens or platforms.")
 
