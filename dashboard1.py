@@ -47,11 +47,8 @@ def compute_risk_metrics(history_df, tvl_usd):
 
     mean_apy = hist["apy"].mean()
 
-    risk_score = 0
-
     # 👉 TVL component
     tvl_score = compute_tvl_score(tvl_usd)
-    risk_score += tvl_score
 
     # 👉 APY level volatility component (0–30)
     if apy_level_vol is None or np.isnan(apy_level_vol):
@@ -64,7 +61,6 @@ def compute_risk_metrics(history_df, tvl_usd):
         level_score = 25
     else:
         level_score = 30
-    risk_score += level_score
 
     # 👉 APY change volatility component (0–25)
     if apy_change_vol is None or np.isnan(apy_change_vol):
@@ -77,7 +73,6 @@ def compute_risk_metrics(history_df, tvl_usd):
         change_score = 20
     else:
         change_score = 25
-    risk_score += change_score
 
     # 👉 Mean APY component (0–15); higher APY = more risk
     if mean_apy is None or np.isnan(mean_apy):
@@ -88,85 +83,26 @@ def compute_risk_metrics(history_df, tvl_usd):
         apy_score = 8
     else:
         apy_score = 15
-    risk_score += apy_score
 
-    # clamp to 0–100
-    risk_score = max(0, min(100, risk_score))
+    # ---------- NORMALIZE TO 0–100 ----------
+    # Raw total from the four components
+    raw_score = tvl_score + level_score + change_score + apy_score
 
-    # Risk flag from score
-    if risk_score < 35:
-        risk_flag = "✅ Overall low risk (large TVL / relatively stable APY)"
-    elif risk_score < 65:
-        risk_flag = "⚠️ Medium risk (moderate volatility and/or mid TVL)"
-    else:
-        risk_flag = "⚠️ High risk (low liquidity and/or highly volatile APY)"
+    # Theoretical min/max from your component design:
+    #   tvl:   2–40
+    #   level: 5–30
+    #   change:5–25
+    #   apy:   0–15
+    MIN_RAW = 12      # 2 + 5 + 5 + 0
+    MAX_RAW = 110     # 40 + 30 + 25 + 15
 
-    return apy_level_vol, apy_change_vol, risk_flag, risk_score
+    norm = (raw_score - MIN_RAW) / (MAX_RAW - MIN_RAW)
+    norm = np.clip(norm, 0.0, 1.0)
 
+    risk_score = norm * 100.0
+    risk_score = int(round(risk_score))   # 👉 always an integer 0–100
 
-def compute_tvl_score(tvl_usd: float) -> float:
-    """
-    TVL-based risk penalty.
-    Small pools get a high score (more risky), large pools get a low score.
-    Clamped between 2 and 40.
-    """
-    if tvl_usd is None or tvl_usd <= 0:
-        return 40.0  # Treat unknown/zero TVL as extremely risky
-
-    tvl_clamped = max(tvl_usd, 500_000)
-    log_tvl = np.log10(tvl_clamped)
-
-    a = 116.7
-    b = 13.46
-
-    tvl_score = a - b * log_tvl
-    tvl_score = float(np.clip(tvl_score, 2.0, 40.0))
-    return tvl_score
-
-
-    tvl_score = compute_tvl_score(tvl_usd)
-    risk_score += tvl_score
-
-    # APY level volatility component (0–30)
-    if apy_level_vol is None or np.isnan(apy_level_vol):
-        level_score = 10
-    elif apy_level_vol <= 2:
-        level_score = 5
-    elif apy_level_vol <= 5:
-        level_score = 15
-    elif apy_level_vol <= 10:
-        level_score = 25
-    else:
-        level_score = 30
-    risk_score += level_score
-
-    # APY change volatility component (0–25)
-    if apy_change_vol is None or np.isnan(apy_change_vol):
-        change_score = 10
-    elif apy_change_vol <= 10:
-        change_score = 5
-    elif apy_change_vol <= 25:
-        change_score = 15
-    elif apy_change_vol <= 50:
-        change_score = 20
-    else:
-        change_score = 25
-    risk_score += change_score
-
-    # Mean APY component (0–15); higher APY = more risk
-    if mean_apy is None or np.isnan(mean_apy):
-        apy_score = 5
-    elif mean_apy <= 4:
-        apy_score = 0
-    elif mean_apy <= 10:
-        apy_score = 8
-    else:
-        apy_score = 15
-    risk_score += apy_score
-
-    risk_score = max(0, min(100, risk_score))
-
-    # Risk flag from score
+    # ---------- RISK FLAG ----------
     if risk_score < 35:
         risk_flag = "✅ Overall low risk (large TVL / relatively stable APY)"
     elif risk_score < 65:
