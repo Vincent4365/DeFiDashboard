@@ -257,6 +257,31 @@ if not filtered_df.empty:
 else:
     st.warning("No pools match your filters. Try selecting more tokens or platforms.")
 
+# Simulate Earnings
+st.header("Simulate earnings")
+
+if not filtered_df.empty:
+    amount = st.number_input("Amount to lend (USD)", value=1000)
+    days = st.slider("Duration (days)", 1, 365, 30)
+
+    pool_labels = (
+        filtered_df["project"] + " (" + filtered_df["chain"] + ") - " + filtered_df["symbol"]
+    )
+    selected_pool = st.selectbox("Select a pool for simulation", options=pool_labels)
+
+    selected_row = filtered_df[
+        (filtered_df["project"] + " (" + filtered_df["chain"] + ") - " + filtered_df["symbol"])
+        == selected_pool
+    ].iloc[0]
+
+    apy = selected_row["apy"]
+    earnings = amount * (apy / 100) * (days / 365)
+
+    st.metric(label="Estimated Earnings ($)", value=f"{earnings:.2f}")
+    
+else:
+    st.warning("No pool selected for simulation.")
+
     # Historical APY Chart + Risk Metrics
     st.header("Historical APY & Risk Metrics")
 
@@ -335,31 +360,6 @@ else:
         st.plotly_chart(fig, width="stretch")
     else:
         st.info("No historical data available for this pool.")
-
-# Simulate Earnings
-st.header("Simulate earnings")
-
-if not filtered_df.empty:
-    amount = st.number_input("Amount to lend (USD)", value=1000)
-    days = st.slider("Duration (days)", 1, 365, 30)
-
-    pool_labels = (
-        filtered_df["project"] + " (" + filtered_df["chain"] + ") - " + filtered_df["symbol"]
-    )
-    selected_pool = st.selectbox("Select a pool for simulation", options=pool_labels)
-
-    selected_row = filtered_df[
-        (filtered_df["project"] + " (" + filtered_df["chain"] + ") - " + filtered_df["symbol"])
-        == selected_pool
-    ].iloc[0]
-
-    apy = selected_row["apy"]
-    earnings = amount * (apy / 100) * (days / 365)
-
-    st.metric(label="Estimated Earnings ($)", value=f"{earnings:.2f}")
-    
-else:
-    st.warning("No pool selected for simulation.")
 
 # Methodology & Disclaimer
 st.markdown("---")
