@@ -89,11 +89,26 @@ def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
 
     norm = (raw_score - MIN_RAW) / (MAX_RAW - MIN_RAW)
     norm = np.clip(norm, 0.0, 1.0)
+    
+    try:
+        risk_score = int(round(norm * 100.0))
 
-    risk_score = norm * 100.0
-    risk_score = int(round(risk_score))
+        if tvl_usd < 250_000:
+            risk_score = max(risk_score, 95)
+        elif tvl_usd < 500_000:
+            risk_score = max(risk_score, 90)
+        elif tvl_usd < 1_000_000:
+            risk_score = max(risk_score, 85)
+        elif tvl_usd < 5_000_000:
+            risk_score = max(risk_score, 60)
+    
+    except Exception:
+        risk_score = None
 
-    # Risk flag
+    if risk_score is None:
+        risk_flag = "⚠️ Risk score unavailable (insufficient or invalid data)"
+        return apy_level_vol, apy_change_vol, risk_flag, risk_score
+
     if risk_score < 35:
         risk_flag = "✅ Overall low risk (large TVL / relatively stable APY)"
     elif risk_score < 65:
