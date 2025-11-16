@@ -251,7 +251,7 @@ with st.sidebar:
         "Benchmark rate (%)",
         min_value=0.0,
         max_value=10.0,
-        value=4.0,
+        value=3.92,
         step=0.01,
     )
 
@@ -325,6 +325,8 @@ else:
 st.markdown("---")
 st.header("Simulate Earnings")
 
+selected_row = None
+
 if not filtered_df.empty:
     amount = st.number_input("Amount to lend (USD)", value=1000)
     days = st.slider("Duration (days)", 1, 365, 30)
@@ -339,13 +341,31 @@ if not filtered_df.empty:
         == selected_pool
     ].iloc[0]
 
-    apy = selected_row["apy"]
-    earnings = amount * (apy / 100) * (days / 365)
+    apy = float(selected_row["apy"] or 0.0)
 
-    st.metric(label="Estimated Earnings ($)", value=f"{earnings:.2f}")
+    # Pool earnings
+    earnings = amount * (apy / 100.0) * (days / 365.0)
+
+    benchmark_apy = float(benchmark_rate)
+    benchmark_earnings = amount * (benchmark_apy / 100.0) * (days / 365.0)
+    excess_apy = apy - benchmark_apy
+    excess_earnings = earnings - benchmark_earnings
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Pool APY (%)", f"{apy:.2f}")
+    col2.metric("Benchmark APY (%)", f"{benchmark_apy:.2f}")
+    col3.metric("Excess APY vs Benchmark (%)", f"{excess_apy:.2f}")
+
+    col4, col5 = st.columns(2)
+    col4.metric("Estimated Earnings (Pool)", f"${earnings:.2f}")
+    col5.metric(
+        "Benchmark Earnings",
+        f"${benchmark_earnings:.2f}",
+        delta=f"{excess_earnings:.2f}",
+        delta_color="normal",
+    )
 else:
     st.warning("No pools available for simulation.")
-    selected_row = None
 
 # Historical data
 
