@@ -126,6 +126,16 @@ def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
 
     try:
         risk_score = int(round(norm * 100.0))
+
+        if tvl_usd < 250_000:
+            risk_score = max(risk_score, 95)
+        elif tvl_usd < 500_000:
+            risk_score = max(risk_score, 90)
+        elif tvl_usd < 1_000_000:
+            risk_score = max(risk_score, 85)
+        elif tvl_usd < 5_000_000:
+            risk_score = max(risk_score, 60)
+    
     except Exception:
         risk_score = None
 
