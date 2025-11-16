@@ -3,16 +3,16 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import numpy as np
+import streamlit.components.v1 as components
 
 st.set_page_config(layout="wide")
 
-st.markdown("""
+components.html("""
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif !important;
 }
-
 h1 {
     font-size: 36px !important;
     font-weight: 700 !important;
@@ -21,21 +21,15 @@ h2, h3 {
     font-size: 26px !important;
     font-weight: 600 !important;
 }
-
-/* Main content width & padding */
 div.block-container {
     padding-top: 1rem !important;
     padding-bottom: 2rem !important;
     max-width: 1100px;
 }
-
-/* Give main content a clean white card look */
 section.main > div {
     padding: 1rem 2rem;
     background: #FFFFFF;
 }
-
-/* Metrics: label + value */
 div[data-testid="stMetricValue"] {
     font-size: 20px !important;
     font-weight: 600 !important;
@@ -43,14 +37,10 @@ div[data-testid="stMetricValue"] {
 div[data-testid="stMetricLabel"] {
     font-size: 14px !important;
 }
-
-/* Expander headers */
 div.streamlit-expanderHeader {
     font-size: 18px !important;
     font-weight: 500 !important;
 }
-
-/* Table header/body text (only affects simple tables / markdown, not ag-grid) */
 th {
     font-weight: 600 !important;
     font-size: 14px !important;
@@ -59,7 +49,7 @@ td {
     font-size: 14px !important;
 }
 </style>
-""", unsafe_allow_html=True)
+""", height=0, width=0)
 
 # Data loading with Streamlit caching (auto-refresh every 3600s)
 # Source: DefiLlama yields and historical APY data
