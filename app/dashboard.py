@@ -4,44 +4,52 @@ import streamlit as st
 import plotly.express as px
 import numpy as np
 
+st.set_page_config(layout="wide")
+
 st.markdown("""
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-/* Title (H1) */
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif !important;
+}
 h1 {
     font-size: 36px !important;
     font-weight: 700 !important;
 }
-
-/* Section Headers (H2, H3) */
 h2, .stSubheader {
     font-size: 26px !important;
     font-weight: 600 !important;
 }
-
-/* Metrics look cleaner with tighter spacing */
 .css-1wqnp9f, .stMetric {
     font-size: 18px !important;
 }
-
-/* Slightly tighten the overall layout */
 .block-container {
     padding-top: 1rem !important;
     padding-bottom: 2rem !important;
     max-width: 1100px;
 }
-
-/* Table tweaks for readability */
 .dataframe tbody tr th {
     font-size: 14px !important;
 }
 .dataframe tbody td {
     font-size: 14px !important;
 }
-
-/* Make expander headers clean */
 .streamlit-expanderHeader {
     font-size: 18px !important;
     font-weight: 500 !important;
+}
+section.main > div {
+    padding: 1rem 2rem;
+    background: #FFFFFF;
+}
+th {
+    font-weight: 600 !important;
+}
+td {
+    font-size: 14px !important;
+}
+.stMetric {
+    font-size: 20px !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -296,7 +304,7 @@ if not filtered_df.empty:
         .format({"apy": "{:.2f}", "Total Liquidity": "${:,.0f}"})
     )
 
-    st.dataframe(styled_df, use_container_width=True)
+    st.dataframe(styled_df, use_container_width=True, height=450)
 else:
     st.warning("No pools match your filters. Try selecting more tokens or platforms.")
 
