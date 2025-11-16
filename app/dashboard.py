@@ -13,8 +13,7 @@ html, body, [class*="css"] {
     font-family: 'Inter', sans-serif !important;
 }
 
-h1 { color: #0066CC !important; }
-h4 {
+h1 {
     font-size: 36px !important;
     font-weight: 700 !important;
 }
