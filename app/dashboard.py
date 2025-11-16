@@ -346,23 +346,27 @@ if not filtered_df.empty:
     # Pool earnings
     earnings = amount * (apy / 100.0) * (days / 365.0)
 
+    # Benchmark earnings and excess vs benchmark
     benchmark_apy = float(benchmark_rate)
     benchmark_earnings = amount * (benchmark_apy / 100.0) * (days / 365.0)
     excess_apy = apy - benchmark_apy
     excess_earnings = earnings - benchmark_earnings
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Pool APY (%)", f"{apy:.2f}")
-    col2.metric("Benchmark APY (%)", f"{benchmark_apy:.2f}")
-    col3.metric("Excess APY vs Benchmark (%)", f"{excess_apy:.2f}")
+    # Primary metrics
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Pool APY (%)", f"{apy:.2f}")
+    c2.metric("Estimated Earnings (Pool)", f"${earnings:.2f}")
+    c3.metric(
+        "Excess Earnings vs Benchmark ($)",
+        f"${excess_earnings:+.2f}",
+        help="Difference between pool earnings and benchmark earnings over the selected period.",
+    )
 
-    col4, col5 = st.columns(2)
-    col4.metric("Estimated Earnings (Pool)", f"${earnings:.2f}")
-    col5.metric(
-        "Benchmark Earnings",
-        f"${benchmark_earnings:.2f}",
-        delta=f"{excess_earnings:.2f}",
-        delta_color="normal",
+    # Benchmark metrics
+    st.caption(
+        f"Benchmark APY: {benchmark_apy:.2f}%   •   "
+        f"Benchmark earnings over {days} days on ${amount:,.0f}: ${benchmark_earnings:.2f}   •   "
+        f"Excess APY vs benchmark: {excess_apy:+.2f}%"
     )
 else:
     st.warning("No pools available for simulation.")
