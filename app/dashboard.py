@@ -6,13 +6,16 @@ import numpy as np
 
 st.set_page_config(layout="wide")
 
-st.markdown("""
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+st.markdown(
+    """
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif !important;
 }
 
+/* Typography */
 h1 {
     font-size: 36px !important;
     font-weight: 700 !important;
@@ -22,8 +25,9 @@ h2, h3 {
     font-weight: 600 !important;
 }
 
+/* Page background + main container */
 section.main {
-    background: #f5f5f5;  /* light grey page background */
+    background: #f5f5f5;
 }
 div.block-container {
     padding-top: 1rem !important;
@@ -31,6 +35,7 @@ div.block-container {
     max-width: 1100px;
 }
 
+/* Card look for each main section after the title block */
 div.block-container > div[data-testid="stVerticalBlock"]:nth-child(n+2) {
     padding: 1.5rem 2rem;
     background: #FFFFFF;
@@ -39,6 +44,7 @@ div.block-container > div[data-testid="stVerticalBlock"]:nth-child(n+2) {
     margin-bottom: 2.0rem;
 }
 
+/* Metrics */
 div[data-testid="stMetricValue"] {
     font-size: 20px !important;
     font-weight: 600 !important;
@@ -47,11 +53,13 @@ div[data-testid="stMetricLabel"] {
     font-size: 14px !important;
 }
 
+/* Expander headers */
 div.streamlit-expanderHeader {
     font-size: 18px !important;
     font-weight: 500 !important;
 }
 
+/* Tables */
 th {
     font-weight: 600 !important;
     font-size: 14px !important;
@@ -60,7 +68,9 @@ td {
     font-size: 14px !important;
 }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # Data loading with Streamlit caching (auto-refresh every 3600s)
 # Source: DefiLlama yields and historical APY data
