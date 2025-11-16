@@ -153,25 +153,29 @@ def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
 
     if risk_score is None:
         risk_flag = (
-             "Risk score unavailable due to insufficient or missing data. "
-            "Volatility and liquidity metrics could not be reliably estimated."
+            "**Risk Assessment: Data Unavailable** — "
+            "Risk score could not be computed due to insufficient or missing historical observations. "
+            "Volatility and liquidity metrics cannot be reliably estimated."
         )
         return apy_level_vol, apy_change_vol, risk_flag, risk_score
 
     if risk_score < 35:
         risk_flag = (
-            "Low estimated risk. The pool exhibits high liquidity depth and low APY variance, "
-            "indicating stable rate dynamics and reduced sensitivity to market shocks."
+            "**Risk Assessment: Low Risk** — "
+            "The pool exhibits high liquidity depth and low APY variance. "
+            "Historical rate behavior indicates stable dynamics and reduced sensitivity to market stress."
         )
     elif risk_score < 65:
         risk_flag = (
-            "Moderate estimated risk. Liquidity levels and APY variance fall within mid-range thresholds, "
-            "implying increased exposure to rate fluctuations and liquidity shifts."
+            "**Risk Assessment: Moderate Risk** — "
+            "Liquidity levels and APY variance fall within mid-range thresholds. "
+            "The pool shows moderate sensitivity to rate fluctuations and liquidity shifts."
         )
     else:
         risk_flag = (
-            "High estimated risk. The pool shows constrained liquidity and/or elevated APY volatility, "
-            "suggesting heightened vulnerability to market stress and liquidity instability."
+            "**Risk Assessment: High Risk** — "
+            "The pool displays constrained liquidity and/or elevated APY volatility. "
+            "Historical patterns indicate heightened vulnerability to market instability and liquidity shocks."
         )
 
     return apy_level_vol, apy_change_vol, risk_flag, risk_score
