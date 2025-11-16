@@ -48,6 +48,13 @@ th {
 td {
     font-size: 14px !important;
 }
+.section-card {
+    padding: 1.5rem 2rem;
+    background: #FFFFFF;
+    border-radius: 10px;
+    box-shadow: 0px 2px 6px rgba(0,0,0,0.06);
+    margin-bottom: 2.5rem;
+}
 </style>
 """, height=0, width=0)
 
@@ -262,9 +269,10 @@ if token_choice:
 if platform_choice:
     filtered_df = filtered_df[filtered_df["project"].isin(platform_choice)]
 
-# Display DataFrame sorted by APY
-st.markdown("---")
-st.header("Lending Pools Data")
+# Lending Pools Data
+with st.container():
+    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
+    st.header("Lending Pools")
 
 def color_tvls(val):
     try:
@@ -320,6 +328,8 @@ if not filtered_df.empty:
     st.dataframe(styled_df, use_container_width=True, height=450)
 else:
     st.warning("No pools match your filters. Try selecting more tokens or platforms.")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # Simulation
 st.markdown("---")
@@ -455,3 +465,13 @@ This platform retrieves decentralized lending market data from publicly accessib
 This dashboard is intended solely for educational and research purposes and does not constitute financial, investment, or trading advice. The risk indicators and scores shown here are heuristic assessments based on publicly available data and should not be relied upon as the sole basis for making financial decisions.
 """
 )
+
+st.markdown("""
+<hr style='margin-top: 3rem; margin-bottom: 1.5rem;'>
+
+<div style='text-align: center; font-size: 14px; color: #555;'>
+    <p><strong>DeFi Lending Transparency and Risk Analyzer</strong></p>
+    <p>Open-source project for research and educational use only. Not financial advice.</p>
+    <p>© 2025 Vincent Bin</p>
+</div>
+""", unsafe_allow_html=True)
