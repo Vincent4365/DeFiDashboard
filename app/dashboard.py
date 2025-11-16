@@ -153,7 +153,7 @@ def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
 
     if risk_score is None:
         risk_flag = (
-            "**Risk Assessment: Data Unavailable** — "
+            "**Data Unavailable** — "
             "Risk score could not be computed due to insufficient or missing historical observations. "
             "Volatility and liquidity metrics cannot be reliably estimated."
         )
@@ -161,19 +161,19 @@ def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
 
     if risk_score < 35:
         risk_flag = (
-            "**Risk Assessment: Low Risk** — "
+            "**Low Risk** — "
             "The pool exhibits high liquidity depth and low APY variance. "
             "Historical rate behavior indicates stable dynamics and reduced sensitivity to market stress."
         )
     elif risk_score < 65:
         risk_flag = (
-            "**Risk Assessment: Moderate Risk** — "
+            "**Moderate Risk** — "
             "Liquidity levels and APY variance fall within mid-range thresholds. "
             "The pool shows moderate sensitivity to rate fluctuations and liquidity shifts."
         )
     else:
         risk_flag = (
-            "**Risk Assessment: High Risk** — "
+            "**High Risk** — "
             "The pool displays constrained liquidity and/or elevated APY volatility. "
             "Historical patterns indicate heightened vulnerability to market instability and liquidity shocks."
         )
@@ -403,7 +403,7 @@ if selected_row is not None:
 
         # Risk flag
         if risk_flag:
-            st.info(f"Risk assessment: {risk_flag}")
+            st.info(f"**Risk assessment:** {risk_flag}")
 
         # Benchmark chart
         history_df = history_df.sort_values("timestamp")
