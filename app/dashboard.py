@@ -3,11 +3,10 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import numpy as np
-import streamlit.components.v1 as components
 
 st.set_page_config(layout="wide")
 
-components.html("""
+st.markdown("""
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 html, body, [class*="css"] {
@@ -56,7 +55,7 @@ td {
     margin-bottom: 2.5rem;
 }
 </style>
-""", height=0, width=0)
+""", unsafe_allow_html=True)
 
 # Data loading with Streamlit caching (auto-refresh every 3600s)
 # Source: DefiLlama yields and historical APY data
@@ -270,31 +269,25 @@ if platform_choice:
     filtered_df = filtered_df[filtered_df["project"].isin(platform_choice)]
 
 # Lending Pools Data
-with st.container():
-    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-    st.header("Lending Pools")
-
 def color_tvls(val):
     try:
         v = float(val)
     except Exception:
         return ""
-
     if v > 50_000_000:
-        return "color: green"          # Low risk
+        return "color: green"
     elif v > 10_000_000:
-        return "color: goldenrod"      # Medium
+        return "color: goldenrod"
     elif v > 1_000_000:
-        return "color: orangered"      # High
+        return "color: orangered"
     else:
-        return "color: red"            # Very High
+        return "color: red"
 
 def tvl_risk(tvl):
     try:
         v = float(tvl)
-    except:
+    except Exception:
         return "Unknown"
-
     if v > 50_000_000:
         return "Low"
     elif v > 10_000_000:
@@ -303,31 +296,33 @@ def tvl_risk(tvl):
         return "High"
     else:
         return "Very High"
-        
-if not filtered_df.empty:
-    filtered_df = filtered_df.copy()
-    filtered_df["riskFlag"] = filtered_df["tvlUsd"].apply(tvl_risk)
 
-    sorted_df = filtered_df[
-        ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag"]
-    ].sort_values(by="apy", ascending=False)
+with st.container():
+    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
+    st.header("Lending Pools")
 
-    # Rename only for display
-    sorted_df = sorted_df.rename(columns={
-        "tvlUsd": "Total Liquidity",
-        "riskFlag": "TVL Risk",
-    })
+    if not filtered_df.empty:
+        filtered_df = filtered_df.copy()
+        filtered_df["riskFlag"] = filtered_df["tvlUsd"].apply(tvl_risk)
 
-    # Style the table
-    styled_df = (
-        sorted_df.style
-        .map(color_tvls, subset=["Total Liquidity"])
-        .format({"apy": "{:.2f}", "Total Liquidity": "${:,.0f}"})
-    )
+        sorted_df = filtered_df[
+            ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag"]
+        ].sort_values(by="apy", ascending=False)
 
-    st.dataframe(styled_df, use_container_width=True, height=450)
-else:
-    st.warning("No pools match your filters. Try selecting more tokens or platforms.")
+        sorted_df = sorted_df.rename(columns={
+            "tvlUsd": "Total Liquidity",
+            "riskFlag": "TVL Risk",
+        })
+
+        styled_df = (
+            sorted_df.style
+            .map(color_tvls, subset=["Total Liquidity"])
+            .format({"apy": "{:.2f}", "Total Liquidity": "${:,.0f}"})
+        )
+
+        st.dataframe(styled_df, use_container_width=True, height=450)
+    else:
+        st.warning("No pools match your filters. Try selecting more tokens or platforms.")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
