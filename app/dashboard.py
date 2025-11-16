@@ -12,6 +12,7 @@ st.markdown("""
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif !important;
 }
+
 h1 {
     font-size: 36px !important;
     font-weight: 700 !important;
@@ -20,15 +21,24 @@ h2, h3 {
     font-size: 26px !important;
     font-weight: 600 !important;
 }
+
+section.main {
+    background: #f5f5f5;  /* light grey page background */
+}
 div.block-container {
     padding-top: 1rem !important;
     padding-bottom: 2rem !important;
     max-width: 1100px;
 }
-section.main > div {
-    padding: 1rem 2rem;
+
+div.block-container > div[data-testid="stVerticalBlock"]:nth-child(n+2) {
+    padding: 1.5rem 2rem;
     background: #FFFFFF;
+    border-radius: 10px;
+    box-shadow: 0px 2px 6px rgba(0,0,0,0.06);
+    margin-bottom: 2.0rem;
 }
+
 div[data-testid="stMetricValue"] {
     font-size: 20px !important;
     font-weight: 600 !important;
@@ -36,23 +46,18 @@ div[data-testid="stMetricValue"] {
 div[data-testid="stMetricLabel"] {
     font-size: 14px !important;
 }
+
 div.streamlit-expanderHeader {
     font-size: 18px !important;
     font-weight: 500 !important;
 }
+
 th {
     font-weight: 600 !important;
     font-size: 14px !important;
 }
 td {
     font-size: 14px !important;
-}
-.section-card {
-    padding: 1.5rem 2rem;
-    background: #FFFFFF;
-    border-radius: 10px;
-    box-shadow: 0px 2px 6px rgba(0,0,0,0.06);
-    margin-bottom: 2.5rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -297,34 +302,30 @@ def tvl_risk(tvl):
     else:
         return "Very High"
 
-with st.container():
-    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-    st.header("Lending Pools")
+st.header("Lending Pools")
 
-    if not filtered_df.empty:
-        filtered_df = filtered_df.copy()
-        filtered_df["riskFlag"] = filtered_df["tvlUsd"].apply(tvl_risk)
+if not filtered_df.empty:
+    filtered_df = filtered_df.copy()
+    filtered_df["riskFlag"] = filtered_df["tvlUsd"].apply(tvl_risk)
 
-        sorted_df = filtered_df[
-            ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag"]
-        ].sort_values(by="apy", ascending=False)
+    sorted_df = filtered_df[
+        ["project", "chain", "symbol", "apy", "tvlUsd", "riskFlag"]
+    ].sort_values(by="apy", ascending=False)
 
-        sorted_df = sorted_df.rename(columns={
-            "tvlUsd": "Total Liquidity",
-            "riskFlag": "TVL Risk",
-        })
+    sorted_df = sorted_df.rename(columns={
+        "tvlUsd": "Total Liquidity",
+        "riskFlag": "TVL Risk",
+    })
 
-        styled_df = (
-            sorted_df.style
-            .map(color_tvls, subset=["Total Liquidity"])
-            .format({"apy": "{:.2f}", "Total Liquidity": "${:,.0f}"})
-        )
+    styled_df = (
+        sorted_df.style
+        .map(color_tvls, subset=["Total Liquidity"])
+        .format({"apy": "{:.2f}", "Total Liquidity": "${:,.0f}"})
+    )
 
-        st.dataframe(styled_df, use_container_width=True, height=450)
-    else:
-        st.warning("No pools match your filters. Try selecting more tokens or platforms.")
-
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.dataframe(styled_df, use_container_width=True, height=450)
+else:
+    st.warning("No pools match your filters. Try selecting more tokens or platforms.")
 
 # Simulation
 st.markdown("---")
