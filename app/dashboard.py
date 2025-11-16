@@ -152,15 +152,27 @@ def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
         risk_score = None
 
     if risk_score is None:
-        risk_flag = "⚠️ Risk score unavailable (insufficient or invalid data)"
+        risk_flag = (
+             "Risk score unavailable due to insufficient or missing data. "
+            "Volatility and liquidity metrics could not be reliably estimated."
+        )
         return apy_level_vol, apy_change_vol, risk_flag, risk_score
 
     if risk_score < 35:
-        risk_flag = "✅ Overall low risk (large TVL / relatively stable APY)"
+        risk_flag = (
+            "Low estimated risk. The pool exhibits high liquidity depth and low APY variance, "
+            "indicating stable rate dynamics and reduced sensitivity to market shocks."
+        )
     elif risk_score < 65:
-        risk_flag = "⚠️ Medium risk (moderate volatility and/or mid TVL)"
+        risk_flag = (
+            "Moderate estimated risk. Liquidity levels and APY variance fall within mid-range thresholds, "
+            "implying increased exposure to rate fluctuations and liquidity shifts."
+        )
     else:
-        risk_flag = "⚠️ High risk (low liquidity and/or highly volatile APY)"
+        risk_flag = (
+            "High estimated risk. The pool shows constrained liquidity and/or elevated APY volatility, "
+            "suggesting heightened vulnerability to market stress and liquidity instability."
+        )
 
     return apy_level_vol, apy_change_vol, risk_flag, risk_score
 
@@ -412,6 +424,6 @@ st.markdown(
     """
 This platform retrieves decentralized lending market data from publicly accessible sources, such as DeFiLlama’s open API. All analytical components—including historical APY processing, volatility modeling, liquidity-depth evaluation, TVL-based severity scoring, normalization logic, and visualization design—are independently developed for this project. The goal of this system is to provide clear, data-driven insight into the stability, liquidity, and risk characteristics of decentralized lending markets, supporting greater transparency and informed participation within the DeFi ecosystem.
 
-This dashboard is intended solely for educational and research purposes and does **not** constitute financial, investment, or trading advice. The risk indicators and scores shown here are heuristic assessments based on publicly available data and should not be relied upon as the sole basis for making financial decisions.
+This dashboard is intended solely for educational and research purposes and does not constitute financial, investment, or trading advice. The risk indicators and scores shown here are heuristic assessments based on publicly available data and should not be relied upon as the sole basis for making financial decisions.
 """
 )
