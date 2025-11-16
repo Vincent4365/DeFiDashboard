@@ -4,6 +4,48 @@ import streamlit as st
 import plotly.express as px
 import numpy as np
 
+st.markdown("""
+<style>
+/* Title (H1) */
+h1 {
+    font-size: 36px !important;
+    font-weight: 700 !important;
+}
+
+/* Section Headers (H2, H3) */
+h2, .stSubheader {
+    font-size: 26px !important;
+    font-weight: 600 !important;
+}
+
+/* Metrics look cleaner with tighter spacing */
+.css-1wqnp9f, .stMetric {
+    font-size: 18px !important;
+}
+
+/* Slightly tighten the overall layout */
+.block-container {
+    padding-top: 1rem !important;
+    padding-bottom: 2rem !important;
+    max-width: 1100px;
+}
+
+/* Table tweaks for readability */
+.dataframe tbody tr th {
+    font-size: 14px !important;
+}
+.dataframe tbody td {
+    font-size: 14px !important;
+}
+
+/* Make expander headers clean */
+.streamlit-expanderHeader {
+    font-size: 18px !important;
+    font-weight: 500 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # Data loading with Streamlit caching (auto-refresh every 3600s)
 # Source: DefiLlama yields and historical APY data
 @st.cache_data(ttl=3600)
@@ -200,6 +242,7 @@ if platform_choice:
     filtered_df = filtered_df[filtered_df["project"].isin(platform_choice)]
 
 # Display DataFrame sorted by APY
+st.markdown("---")
 st.header("Lending Pools Data")
 
 def color_tvls(val):
@@ -258,6 +301,7 @@ else:
     st.warning("No pools match your filters. Try selecting more tokens or platforms.")
 
 # Simulation
+st.markdown("---")
 st.header("Simulate Earnings")
 
 if not filtered_df.empty:
@@ -285,6 +329,7 @@ else:
 # Historical data
 
 if selected_row is not None:
+    st.markdown("---")
     st.header("Historical APY & Risk Metrics")
 
     pool_id = selected_row["pool"]
