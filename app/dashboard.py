@@ -36,7 +36,7 @@ def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
     # Volatility of APY level (% points)
     apy_level_vol = hist["apy"].std()
 
-    # Volatility of APY changes (day-to-day jumps, % change)
+    # Volatility of APY changes (% change)
     hist = hist.sort_values("timestamp")
     hist["apy_change"] = hist["apy"].pct_change()
     apy_change_vol = hist["apy_change"].std()
@@ -81,7 +81,6 @@ def compute_risk_metrics(history_df, tvl_usd, baseline_apy):
         k = 2.0
         apy_score = 15.0 * (1.0 - np.exp(-excess / k))
 
-    # Raw total from the four components
     raw_score = tvl_score + level_score + change_score + apy_score
 
     MIN_RAW = 12      # 2 + 5 + 5 + 0
@@ -144,10 +143,11 @@ def compute_tvl_score(tvl_usd: float) -> float:
     
 # App
 
-st.title("DeFi Lending Rates")
+st.title("DeFi Lending Transparency and Risk Analyzer")
 st.markdown(
-    "Real-time DeFi lending rates with simple risk metrics based on APY volatility and TVL. "
-    "Data source: DefiLlama."
+    "An open-source DeFi lending transparency and risk analysis platform that evaluates decentralized lending markets using statistical volatility modeling, liquidity-depth metrics, and TVL-based risk severity tiers. "
+    "The system provides objective, real-time assessments of lending pool risk, offering users clear visibility into APY stability, liquidity fragility, and systemic vulnerabilities across decentralized finance. "
+    "This project enhances financial transparency and supports safer consumer, institutional, and research participation in the rapidly expanding DeFi ecosystem."
 )
 
 df = load_data()
@@ -257,8 +257,8 @@ if not filtered_df.empty:
 else:
     st.warning("No pools match your filters. Try selecting more tokens or platforms.")
 
-# Simulate Earnings
-st.header("Simulate earnings")
+# Simulation
+st.header("Simulate Earnings")
 
 if not filtered_df.empty:
     amount = st.number_input("Amount to lend (USD)", value=1000)
@@ -267,7 +267,7 @@ if not filtered_df.empty:
     pool_labels = (
         filtered_df["project"] + " (" + filtered_df["chain"] + ") - " + filtered_df["symbol"]
     )
-    selected_pool = st.selectbox("Select a pool for simulation", options=pool_labels)
+    selected_pool = st.selectbox("Select a pool", options=pool_labels)
 
     selected_row = filtered_df[
         (filtered_df["project"] + " (" + filtered_df["chain"] + ") - " + filtered_df["symbol"])
@@ -278,17 +278,20 @@ if not filtered_df.empty:
     earnings = amount * (apy / 100) * (days / 365)
 
     st.metric(label="Estimated Earnings ($)", value=f"{earnings:.2f}")
-    
 else:
-    st.warning("No pool selected for simulation.")
+    st.warning("No pools available for simulation.")
+    selected_row = None
 
-    # Historical APY Chart + Risk Metrics
+# Historical data
+
+if selected_row is not None:
     st.header("Historical APY & Risk Metrics")
 
     pool_id = selected_row["pool"]
     history_df = load_pool_chart(pool_id)
 
     if not history_df.empty and "timestamp" in history_df.columns:
+
         # Timestamp conversion
         if np.issubdtype(history_df["timestamp"].dtype, np.number):
             history_df["timestamp"] = pd.to_datetime(
@@ -299,7 +302,6 @@ else:
                 history_df["timestamp"], errors="coerce"
             )
 
-        # Drop rows where timestamp couldn't be parsed
         history_df = history_df.dropna(subset=["timestamp"])
 
         # Compute risk metrics
@@ -308,39 +310,36 @@ else:
             history_df, tvl_usd, baseline_apy
         )
 
+        # Metrics row
         col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Current APY (%)", f"{apy:.2f}")
-        with col2:
-            if apy_level_vol is not None:
-                st.metric("APY Level Volatility (std dev, % pts)", f"{apy_level_vol:.2f}")
-        with col3:
-            if apy_change_vol is not None:
-                st.metric("APY Change Volatility (std dev, %)", f"{apy_change_vol:.2f}")
-        with col4:
-            if risk_score is not None:
-                st.metric("Risk Score (0–100)", f"{risk_score:.0f}")
+        col1.metric("Current APY (%)", f"{apy:.2f}")
+        if apy_level_vol is not None:
+            col2.metric("APY Volatility (std dev)", f"{apy_level_vol:.2f}")
+        if apy_change_vol is not None:
+            col3.metric("APY Change Volatility (%)", f"{apy_change_vol:.2f}")
+        if risk_score is not None:
+            col4.metric("Risk Score (0–100)", f"{risk_score:.0f}")
 
-        # 30-day summary stats
-        if not history_df.empty:
-            max_ts = history_df["timestamp"].max()
-            if pd.notna(max_ts):
-                cutoff = max_ts - pd.Timedelta(days=30)
-                last_30d = history_df[history_df["timestamp"] >= cutoff]
-                if not last_30d.empty:
-                    mean_30d = last_30d["apy"].mean()
-                    min_apy = history_df["apy"].min()
-                    max_apy = history_df["apy"].max()
-                    st.write(
-                        f"**Last 30 days average APY:** {mean_30d:.2f}%  |  "
-                        f"**Historical min:** {min_apy:.2f}%  |  "
-                        f"**max:** {max_apy:.2f}%"
-                    )
+        # 30-day stats
+        max_ts = history_df["timestamp"].max()
+        if pd.notna(max_ts):
+            cutoff = max_ts - pd.Timedelta(days=30)
+            last_30d = history_df[history_df["timestamp"] >= cutoff]
+            if not last_30d.empty:
+                mean_30d = last_30d["apy"].mean()
+                min_apy = history_df["apy"].min()
+                max_apy = history_df["apy"].max()
+                st.write(
+                    f"**Last 30 days average APY:** {mean_30d:.2f}%  |  "
+                    f"**Historical min:** {min_apy:.2f}%  |  "
+                    f"**max:** {max_apy:.2f}%"
+                )
 
+        # Risk flag
         if risk_flag:
             st.info(f"Risk assessment: {risk_flag}")
 
-        # Benchmark line
+        # Benchmark chart
         history_df = history_df.sort_values("timestamp")
         history_df["benchmark"] = benchmark_rate
 
@@ -348,16 +347,11 @@ else:
             history_df,
             x="timestamp",
             y=["apy", "benchmark"],
-            labels={
-                "value": "APY (%)",
-                "timestamp": "Date",
-                "variable": "Series",
-            },
+            labels={"value": "APY (%)", "timestamp": "Date", "variable": "Series"},
             title=f"Historical APY vs Benchmark for {selected_pool}",
         )
-        fig.update_traces(mode="lines")
-        fig.update_layout(title_x=0.5, legend_title_text="")
-        st.plotly_chart(fig, width="stretch")
+        fig.update_layout(title_x=0.5)
+        st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No historical data available for this pool.")
 
@@ -366,11 +360,8 @@ st.markdown("---")
 st.subheader("Methodology & Disclaimer")
 st.markdown(
     """
-- **Data source:** DefiLlama lending pool API.  
-- **APY Level Volatility:** Standard deviation of historical APY observations (percentage points).  
-- **APY Change Volatility:** Standard deviation of day-to-day percentage changes in APY.  
-- **Risk Score & Flags:** Heuristic rules combining TVL, APY level, and volatility; these are simplified indicators.  
+This platform retrieves decentralized lending market data from publicly accessible sources, such as DeFiLlama’s open API. All analytical components—including historical APY processing, volatility modeling, liquidity-depth evaluation, TVL-based severity scoring, normalization logic, and visualization design—are independently developed for this project. The goal of this system is to provide clear, data-driven insight into the stability, liquidity, and risk characteristics of decentralized lending markets, supporting greater transparency and informed participation within the DeFi ecosystem.
 
-This dashboard is for educational and research purposes only and does **not** constitute financial advice.
+This dashboard is intended solely for educational and research purposes and does **not** constitute financial, investment, or trading advice. The risk indicators and scores shown here are heuristic assessments based on publicly available data and should not be relied upon as the sole basis for making financial decisions.
 """
 )
