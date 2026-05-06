@@ -399,7 +399,7 @@ if selected_row is not None:
     if not history_df.empty and "timestamp" in history_df.columns:
 
         # Timestamp conversion
-        if np.issubdtype(history_df["timestamp"].dtype, np.number):
+        if pd.api.types.is_numeric_dtype(history_df["timestamp"]):
             history_df["timestamp"] = pd.to_datetime(
                 history_df["timestamp"], unit="s", errors="coerce"
             )
